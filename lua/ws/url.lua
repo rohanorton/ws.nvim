@@ -25,13 +25,14 @@ function Url.parse(addr)
     error([[The URL contains a fragment identifier]])
   end
 
+  local host = string.match(pathname, "[a-z0-9%-_%.]+")
+
   -- TODO: Port when not explicitly provided
   local port = string.match(pathname, ":(%d*)")
 
   return {
     protocol = protocol,
-    -- TODO: Don't hardcode this!
-    domain = "127.0.0.1",
+    host = host,
     port = port,
   }
 end

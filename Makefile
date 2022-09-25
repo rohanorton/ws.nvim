@@ -14,3 +14,7 @@ test.integration: # Runs integration test
 test.websocket_client: # Runs websocket client test
 	$(call run_test, lua/tests/ws/websocket_client_spec.lua)
 .PHONY: test.websocket_client
+
+test.url: # Runs url test
+	$(call run_test, lua/tests/ws/url_spec.lua)
+.PHONY: test.url

@@ -25,7 +25,7 @@ end
 function WebSocketClient:on_message(_) end
 
 function WebSocketClient:connect()
-  self.__tcp_client:connect(self.address.domain, self.address.port, function(err)
+  self.__tcp_client:connect(self.address.host, self.address.port, function(err)
     if err then
       return self.__handlers.on_error(err)
     end
