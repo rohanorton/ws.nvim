@@ -6,6 +6,25 @@ local uv = vim.loop
 local WebSocketClient = require("ws.websocket_client")
 
 describe("WebSocketClient", function()
+  describe(":new()", function()
+    it("throws error when using an invalid url", function()
+      assert.has_error(function()
+        WebSocketClient:new("foo")
+      end, [[Invalid URL: foo]])
+
+      assert.has_error(function()
+        WebSocketClient:new("https://websocket-echo.com")
+      end, [[The URL's protocol must be one of "ws:", "wss:", or "ws+unix:"]])
+
+      assert.has_error(function()
+        WebSocketClient:new("ws+unix:")
+      end, [[The URL's pathname is empty]])
+
+      assert.has_error(function()
+        WebSocketClient:new("wss://websocket-echo.com#foo")
+      end, [[The URL contains a fragment identifier]])
+    end)
+  end)
   describe(":connect", function()
     a.it("connects to tcp server", function()
       local tx, rx = channel.oneshot()
