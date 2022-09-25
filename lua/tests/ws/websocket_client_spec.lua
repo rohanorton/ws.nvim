@@ -25,7 +25,7 @@ describe("WebSocketClient", function()
       end, [[The URL contains a fragment identifier]])
     end)
   end)
-  describe(":connect", function()
+  describe(":connect()", function()
     a.it("connects to tcp server", function()
       local tx, rx = channel.oneshot()
 
@@ -41,6 +41,24 @@ describe("WebSocketClient", function()
       -- Run Test Code
       WebSocketClient:new(server_url):connect()
       eq(rx(), "Success!")
+    end)
+    a.it("closes with ECONNREFUSED error if no server listning", function()
+      local tx, rx = channel.oneshot()
+
+      -- Setup TCP Server
+      local server = uv.new_tcp()
+      uv.tcp_bind(server, "127.0.0.1", 0) -- Port 0 => Unused port assigned
+      local addr = uv.tcp_getsockname(server)
+      local server_url = "ws://127.0.0.1:" .. addr.port
+      uv.close(server) -- Close server before connecting
+
+      -- Run Test Code
+      local ws = WebSocketClient:new(server_url)
+      ws:on_error(function(err)
+        tx(err)
+      end)
+      ws:connect()
+      eq("ECONNREFUSED", rx())
     end)
   end)
 end)
