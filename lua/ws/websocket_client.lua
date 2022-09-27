@@ -24,8 +24,23 @@ end
 
 function WebSocketClient:on_message(_) end
 
+local function get_ipaddress(hostname)
+  local addr_info = uv.getaddrinfo(hostname)
+  for _, value in ipairs(addr_info) do
+    if value.family == "inet" and value.protocol == "tcp" then
+      return value.addr
+    end
+  end
+end
+
 function WebSocketClient:connect()
-  self.__tcp_client:connect(self.address.host, self.address.port, function(err)
+  local ip_addr = get_ipaddress(self.address.host)
+
+  if not ip_addr then
+    return self.__handlers.on_error("ENOTFOUND")
+  end
+
+  self.__tcp_client:connect(ip_addr, self.address.port, function(err)
     if err then
       return self.__handlers.on_error(err)
     end
