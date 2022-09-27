@@ -7,8 +7,15 @@ function Handshake:new(o)
   return o
 end
 
+function Handshake:path()
+  if self.address.path then
+    return self.address.path
+  end
+  return "/"
+end
+
 function Handshake:send(client)
-  client:write("GET / HTTP/1.1\r\n")
+  client:write("GET " .. self:path() .. " HTTP/1.1\r\n")
   client:write("Host: " .. self.address.host .. ":" .. self.address.port .. "\r\n")
   client:write("Upgrade: websocket\r\n")
   client:write("Connection: Upgrade\r\n")
