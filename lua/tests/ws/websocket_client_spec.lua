@@ -26,53 +26,59 @@ describe("WebSocketClient", function()
     end)
   end)
   describe(":connect()", function()
+    local server, server_url, port
+
+    before_each(function()
+      -- Create a TCP server bound to a free port
+      server = uv.new_tcp()
+      uv.tcp_bind(server, "127.0.0.1", 0)
+
+      -- Generate server URL
+      local addr = uv.tcp_getsockname(server)
+      port = addr.port
+      server_url = "ws://127.0.0.1:" .. port
+    end)
+
+    after_each(function()
+      -- Close TCP server if still running
+      if server:is_active() then
+        server:close()
+      end
+    end)
+
     a.it("connects to tcp server", function()
       local tx, rx = channel.oneshot()
 
-      -- Setup TCP Server
-      local server = uv.new_tcp()
-      uv.tcp_bind(server, "127.0.0.1", 0) -- Port 0 => Unused port assigned
-      local addr = uv.tcp_getsockname(server)
-      local server_url = "ws://127.0.0.1:" .. addr.port
-      uv.listen(server, 128, function()
+      server:listen(128, function()
         tx("Success!") -- Succeed on server access
       end)
 
-      -- Run Test Code
       WebSocketClient:new(server_url):connect()
       eq(rx(), "Success!")
     end)
+
     a.it("connects to tcp server using domain name", function()
       local tx, rx = channel.oneshot()
 
-      -- Setup TCP Server
-      local server = uv.new_tcp()
-      uv.tcp_bind(server, "127.0.0.1", 0) -- Port 0 => Unused port assigned
-      local addr = uv.tcp_getsockname(server)
-      local server_url = "ws://localhost:" .. addr.port -- <-- localhost rather than IP address
-      uv.listen(server, 128, function()
+      server:listen(128, function()
         tx("Success!") -- Succeed on server access
       end)
 
-      -- Run Test Code
-      local ws = WebSocketClient:new(server_url)
+      local server_url_with_domain = "ws://localhost:" .. port
+      local ws = WebSocketClient:new(server_url_with_domain)
       ws:on_error(function(err)
         tx(err)
       end)
       ws:connect()
       eq("Success!", rx())
     end)
+
     a.it("closes with ECONNREFUSED error if no server listning", function()
       local tx, rx = channel.oneshot()
 
-      -- Setup TCP Server
-      local server = uv.new_tcp()
-      uv.tcp_bind(server, "127.0.0.1", 0) -- Port 0 => Unused port assigned
-      local addr = uv.tcp_getsockname(server)
-      local server_url = "ws://127.0.0.1:" .. addr.port
-      uv.close(server) -- Close server before connecting
+      -- Close server before connecting, so we know that address is empty
+      server:close()
 
-      -- Run Test Code
       local ws = WebSocketClient:new(server_url)
       ws:on_error(function(err)
         tx(err)
