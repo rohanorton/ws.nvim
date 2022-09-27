@@ -18,3 +18,7 @@ test.websocket_client: # Runs websocket client test
 test.url: # Runs url test
 	$(call run_test, lua/tests/ws/url_spec.lua)
 .PHONY: test.url
+
+test.websocket_key: # Runs websocket key test
+	$(call run_test, lua/tests/ws/websocket_key_spec.lua)
+.PHONY: test.websocket_key

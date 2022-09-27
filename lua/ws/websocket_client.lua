@@ -1,4 +1,5 @@
 local Url = require("ws.url")
+local WebSocketKey = require("ws.websocket_key")
 local uv = vim.loop
 
 local WebSocketClient = {}
@@ -8,10 +9,7 @@ function WebSocketClient:new(address)
     address = Url.parse(address),
     __tcp_client = uv.new_tcp(),
     __handlers = {},
-    -- TODO: implement webhook key generator
-    __generator_strategy = function()
-      return "dummy-key"
-    end,
+    __generator_strategy = WebSocketKey.create,
   }
   setmetatable(o, self)
   self.__index = self
