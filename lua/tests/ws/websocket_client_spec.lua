@@ -86,5 +86,45 @@ describe("WebSocketClient", function()
       ws:connect()
       eq("ECONNREFUSED", rx())
     end)
+
+    a.it("sends HTTP handshake", function()
+      local tx, rx = channel.oneshot()
+
+      server:listen(128, function()
+        local client = uv.new_tcp()
+        server:accept(client)
+        client:read_start(function(err, chunk)
+          if err then
+            return tx(err)
+          end
+          tx(chunk)
+        end)
+      end)
+
+      local ws = WebSocketClient:new(server_url)
+
+      -- Override websocket key generator to make test deterministic
+      local fake_websocket_key = "testkey-123"
+      ws:set_websocket_key_generator_strategy(function()
+        return fake_websocket_key
+      end)
+
+      ws:on_error(function(err)
+        tx(err)
+      end)
+
+      ws:connect()
+
+      local handshake = ""
+        .. "GET / HTTP/1.1\r\n"
+        .. ("Host: 127.0.0.1:" .. port .. "\r\n")
+        .. "Upgrade: websocket\r\n"
+        .. "Connection: Upgrade\r\n"
+        .. ("Sec-WebSocket-Key: " .. fake_websocket_key .. "\r\n")
+        .. "Sec-WebSocket-Version: 13\r\n"
+        .. "\r\n"
+
+      eq(handshake, rx())
+    end)
   end)
 end)
