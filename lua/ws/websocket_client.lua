@@ -1,5 +1,7 @@
 local Url = require("ws.url")
 local WebSocketKey = require("ws.websocket_key")
+local Handshake = require("ws.handshake")
+
 local uv = vim.loop
 
 local WebSocketClient = {}
@@ -45,13 +47,11 @@ function WebSocketClient:connect()
     if err then
       return self.__handlers.on_error(err)
     end
-    self.__tcp_client:write("GET / HTTP/1.1\r\n")
-    self.__tcp_client:write("Host: " .. self.address.host .. ":" .. self.address.port .. "\r\n")
-    self.__tcp_client:write("Upgrade: websocket\r\n")
-    self.__tcp_client:write("Connection: Upgrade\r\n")
-    self.__tcp_client:write("Sec-WebSocket-Key: " .. WebSocketKey.create() .. "\r\n")
-    self.__tcp_client:write("Sec-WebSocket-Version: 13\r\n")
-    self.__tcp_client:write("\r\n")
+
+    Handshake:new({
+      address = self.address,
+      websocket_key = WebSocketKey.create(),
+    }):send(self.__tcp_client)
   end)
 end
 
