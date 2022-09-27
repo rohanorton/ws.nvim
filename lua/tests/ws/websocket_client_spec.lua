@@ -28,6 +28,20 @@ describe("WebSocketClient", function()
   describe(":connect()", function()
     local server, server_url, port
 
+    -- HELPERS --
+    local function server_listen_for_connection(cb)
+      server:listen(128, cb)
+    end
+
+    local function server_listen_for_data(cb)
+      server_listen_for_connection(function()
+        local client = uv.new_tcp()
+        server:accept(client)
+        client:read_start(cb)
+      end)
+    end
+
+    -- SETUP / TEARDOWN --
     before_each(function()
       -- Create a TCP server bound to a free port
       server = uv.new_tcp()
@@ -46,10 +60,11 @@ describe("WebSocketClient", function()
       end
     end)
 
+    -- TESTS --
     a.it("connects to tcp server", function()
       local tx, rx = channel.oneshot()
 
-      server:listen(128, function()
+      server_listen_for_connection(function()
         tx("Success!") -- Succeed on server access
       end)
 
@@ -60,7 +75,7 @@ describe("WebSocketClient", function()
     a.it("connects to tcp server using domain name", function()
       local tx, rx = channel.oneshot()
 
-      server:listen(128, function()
+      server_listen_for_connection(function()
         tx("Success!") -- Succeed on server access
       end)
 
@@ -90,15 +105,8 @@ describe("WebSocketClient", function()
     a.it("sends HTTP handshake", function()
       local tx, rx = channel.oneshot()
 
-      server:listen(128, function()
-        local client = uv.new_tcp()
-        server:accept(client)
-        client:read_start(function(err, chunk)
-          if err then
-            return tx(err)
-          end
-          tx(chunk)
-        end)
+      server_listen_for_data(function(err, chunk)
+        tx(err or chunk)
       end)
 
       local ws = WebSocketClient:new(server_url)
