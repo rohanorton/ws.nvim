@@ -24,6 +24,19 @@ describe("Url", function()
     it("parses valid URLs into constituent parts", function()
       eq(Url.parse("ws://127.0.0.1:1234"), { protocol = "ws", host = "127.0.0.1", port = "1234" })
       eq(Url.parse("wss://localhost:8080"), { protocol = "wss", host = "localhost", port = "8080" })
+      -- Default Ports:
+      eq(Url.parse("ws://example.com"), { protocol = "ws", host = "example.com", port = "80" })
+      eq(Url.parse("wss://example.com"), { protocol = "wss", host = "example.com", port = "443" })
+      -- Path:
+      eq(
+        Url.parse("ws://example.com/foo/bar"),
+        { protocol = "ws", host = "example.com", path = "/foo/bar", port = "80" }
+      )
+      -- Query:
+      eq(
+        Url.parse("ws+unix://0.0.0.0/hello/world?query=foo&bar=baz"),
+        { protocol = "ws+unix", host = "0.0.0.0", path = "/hello/world", port = "80", query = "?query=foo&bar=baz" }
+      )
     end)
   end)
 end)

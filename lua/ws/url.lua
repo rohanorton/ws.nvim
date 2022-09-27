@@ -25,15 +25,31 @@ function Url.parse(addr)
     error([[The URL contains a fragment identifier]])
   end
 
+  -- Get host
   local host = string.match(pathname, "[a-z0-9%-_%.]+")
 
-  -- TODO: Port when not explicitly provided
+  -- Get path
+  local _, end_dbl_slash = string.find(pathname, "//")
+  end_dbl_slash = end_dbl_slash or 0
+  local path = string.match(pathname, "/[%w%/]*", end_dbl_slash + 1)
+
+  -- Get query
+  local query = string.match(pathname, "?.*")
+
+  -- Get port
+  local is_secure = protocol == "wss"
   local port = string.match(pathname, ":(%d*)")
+  -- Set default port if not explicitly added
+  if not port then
+    port = is_secure and "443" or "80"
+  end
 
   return {
     protocol = protocol,
     host = host,
     port = port,
+    path = path,
+    query = query,
   }
 end
 
