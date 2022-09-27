@@ -9,7 +9,6 @@ function WebSocketClient:new(address)
     address = Url.parse(address),
     __tcp_client = uv.new_tcp(),
     __handlers = {},
-    __generator_strategy = WebSocketKey.create,
   }
   setmetatable(o, self)
   self.__index = self
@@ -35,14 +34,6 @@ local function get_ipaddress(hostname)
   end
 end
 
-function WebSocketClient:set_websocket_key_generator_strategy(generator_strategy)
-  self.__generator_strategy = generator_strategy
-end
-
-function WebSocketClient:generate_websocket_key()
-  return self.__generator_strategy()
-end
-
 function WebSocketClient:connect()
   local ip_addr = get_ipaddress(self.address.host)
 
@@ -58,7 +49,7 @@ function WebSocketClient:connect()
     self.__tcp_client:write("Host: " .. self.address.host .. ":" .. self.address.port .. "\r\n")
     self.__tcp_client:write("Upgrade: websocket\r\n")
     self.__tcp_client:write("Connection: Upgrade\r\n")
-    self.__tcp_client:write("Sec-WebSocket-Key: " .. self:generate_websocket_key() .. "\r\n")
+    self.__tcp_client:write("Sec-WebSocket-Key: " .. WebSocketKey.create() .. "\r\n")
     self.__tcp_client:write("Sec-WebSocket-Version: 13\r\n")
     self.__tcp_client:write("\r\n")
   end)
