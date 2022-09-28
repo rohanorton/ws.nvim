@@ -50,7 +50,7 @@ function WebSocketClient:connect()
 
     Handshake:new({
       address = self.address,
-      websocket_key = WebSocketKey.create(),
+      websocket_key = WebSocketKey:create(),
     }):send(self.__tcp_client)
   end)
 end

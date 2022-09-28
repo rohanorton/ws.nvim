@@ -1,7 +1,10 @@
+local WebSocketKey = require("ws.websocket_key")
+
 local Handshake = {}
 
 function Handshake:new(o)
   o = o or {}
+  o.websocket_key = o.websocket_key or WebSocketKey:create()
   setmetatable(o, self)
   self.__index = self
   return o
@@ -19,7 +22,7 @@ function Handshake:send(client)
   client:write("Host: " .. self.address.host .. ":" .. self.address.port .. "\r\n")
   client:write("Upgrade: websocket\r\n")
   client:write("Connection: Upgrade\r\n")
-  client:write("Sec-WebSocket-Key: " .. self.websocket_key .. "\r\n")
+  client:write("Sec-WebSocket-Key: " .. self.websocket_key:tostring() .. "\r\n")
   client:write("Sec-WebSocket-Version: 13\r\n")
   client:write("\r\n")
 end

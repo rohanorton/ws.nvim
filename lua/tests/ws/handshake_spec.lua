@@ -1,6 +1,7 @@
 local spy = require("luassert.spy")
 
 local Url = require("ws.url")
+local WebSocketKey = require("ws.websocket_key")
 local Handshake = require("ws.handshake")
 
 describe("Handshake", function()
@@ -22,7 +23,7 @@ describe("Handshake", function()
     it("writes handshake to client", function()
       local args = {
         address = Url.parse("ws://foo:8000"),
-        websocket_key = "123-key",
+        websocket_key = WebSocketKey:from("testkey123"),
       }
 
       Handshake:new(args):send(mock_client)
@@ -32,7 +33,7 @@ describe("Handshake", function()
         "Host: foo:8000\r\n",
         "Upgrade: websocket\r\n",
         "Connection: Upgrade\r\n",
-        "Sec-WebSocket-Key: 123-key\r\n",
+        "Sec-WebSocket-Key: testkey123\r\n",
         "Sec-WebSocket-Version: 13\r\n",
         "\r\n",
       })
@@ -41,7 +42,6 @@ describe("Handshake", function()
       local args = {
         address = Url.parse("ws://example.com/chat"),
         --                                   ^^^^^
-        websocket_key = "---",
       }
 
       Handshake:new(args):send(mock_client)
