@@ -3,9 +3,8 @@ local channel = require("plenary.async.control").channel
 local eq = assert.are.same
 local uv = vim.loop
 
+local WebSocketKey = require("ws.websocket_key")
 local WebSocketClient = require("ws.websocket_client")
-local Base64 = require("ws.base64")
-local Sha1 = require("ws.sha1")
 
 describe("WebSocketClient", function()
   describe(":connect()", function()
@@ -147,14 +146,8 @@ describe("WebSocketClient", function()
         end
 
         local client_key = string.match(chunk, "Sec%-WebSocket%-Key: (.-)\r\n")
-        local magic_string = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
-        local server_key = client_key .. magic_string
-        -- sha hash
-        server_key = Sha1.hash(server_key)
-        -- base64
-        server_key = Base64.encode(server_key)
+        local server_key = WebSocketKey:from(client_key):to_server_key()
 
-        -- key
         client:write("HTTP/1.1 101 Switching Protocols\r\n")
         client:write("Upgrade: websocket\r\n")
         client:write("Connection: Upgrade\r\n")
