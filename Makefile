@@ -26,3 +26,7 @@ test.websocket_key: # Runs websocket key test
 test.handshake: # Runs handshake test
 	$(call run_test, lua/tests/ws/handshake_spec.lua)
 .PHONY: test.handshake
+
+test.sha1: # Runs sha1 test
+	$(call run_test, lua/tests/ws/sha1_spec.lua)
+.PHONY: test.sha1
