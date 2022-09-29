@@ -35,20 +35,24 @@ function OpeningHandshake:send(client)
 end
 
 function OpeningHandshake:handle_response(response)
+  if not response then
+    return self.__handlers.on_error("ERROR: NULL Response")
+  end
+
   -- Check is HTTP header
   local is_switching_header = string.match(response, "HTTP/1.1 101 Switching Protocols\r\n")
   if not is_switching_header then
-    return self.__handlers.on_error("ERROR")
+    return self.__handlers.on_error("ERROR: Unexpected Response:\n\n" .. response)
   end
 
   -- Check server key is valid
   local server_key = string.match(response, "Sec%-WebSocket%-Accept: (.-)\r\n")
   if not server_key then
-    return self.__handlers.on_error("ERROR")
+    return self.__handlers.on_error("ERROR: No Server Key")
   end
   local valid_key = self.websocket_key:check_server_key(server_key)
   if not valid_key then
-    return self.__handlers.on_error("ERROR")
+    return self.__handlers.on_error("ERROR: Invalid server key: " .. server_key)
   end
 
   return self.__handlers.on_success()

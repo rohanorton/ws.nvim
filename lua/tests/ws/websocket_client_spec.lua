@@ -91,6 +91,17 @@ describe("WebSocketClient", function()
       eq("ECONNREFUSED", rx())
     end)
 
+    a.it("fails with ENOTFOUND if cannot find IP address", function()
+      local tx, rx = channel.oneshot()
+
+      ws = WebSocketClient:new("ws://a-nonexistent-domain")
+      ws:on_error(function(err)
+        tx(err)
+      end)
+      ws:connect()
+      eq("ENOTFOUND", rx())
+    end)
+
     a.it("sends HTTP handshake", function()
       local tx, rx = channel.oneshot()
 
@@ -135,7 +146,7 @@ describe("WebSocketClient", function()
 
       ws:connect()
 
-      eq("ERROR", rx())
+      eq("ERROR: Unexpected Response:\n\nNot a valid response", rx())
     end)
     a.it("calls on_open when handshake successful", function()
       local tx, rx = channel.oneshot()
@@ -192,7 +203,7 @@ describe("WebSocketClient", function()
 
       ws:connect()
 
-      eq("ERROR", rx())
+      eq("ERROR: Invalid server key: derp", rx())
     end)
   end)
 end)

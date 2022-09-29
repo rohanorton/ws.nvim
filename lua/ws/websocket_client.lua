@@ -37,46 +37,12 @@ end
 
 function WebSocketClient:on_message(_) end
 
-local function get_ipaddress(hostname)
-  local addr_info = uv.getaddrinfo(hostname)
-  for _, value in ipairs(addr_info) do
-    if value.family == "inet" and value.protocol == "tcp" then
-      return value.addr
-    end
-  end
-end
-
-function WebSocketClient:create_opening_handshake()
-  local opening_handshake = OpeningHandshake:new({
-    address = self.address,
-    websocket_key = WebSocketKey:create(),
-  })
-  opening_handshake:on_success(self.__handlers.on_open)
-  opening_handshake:on_error(self.__handlers.on_error)
-  return opening_handshake
-end
-
 function WebSocketClient:connect()
-  local opening_handshake = self:create_opening_handshake()
-
-  local ip_addr = get_ipaddress(self.address.host)
-
-  if not ip_addr then
-    return self.__handlers.on_error("ENOTFOUND")
-  end
-
-  self.__tcp_client:connect(ip_addr, self.address.port, function(err)
-    if err then
-      return self.__handlers.on_error(err)
-    end
-
-    self.__tcp_client:read_start(function(err, chunk)
-      if err then
-        return self.__handlers.on_error(err)
-      end
+  self:__connect_to_tcp(function()
+    local opening_handshake = self:__create_opening_handshake()
+    self:__read_start(function(chunk)
       opening_handshake:handle_response(chunk)
     end)
-
     opening_handshake:send(self.__tcp_client)
   end)
 end
@@ -89,6 +55,52 @@ end
 
 function WebSocketClient:is_active()
   return self.__tcp_client:is_active()
+end
+
+-- PRIVATE --
+
+function WebSocketClient:__create_opening_handshake()
+  local opening_handshake = OpeningHandshake:new({
+    address = self.address,
+    websocket_key = WebSocketKey:create(),
+  })
+  opening_handshake:on_success(self.__handlers.on_open)
+  opening_handshake:on_error(self.__handlers.on_error)
+  return opening_handshake
+end
+
+function WebSocketClient:__get_ipaddress()
+  local hostname = self.address.host
+  local ip_addr
+  local addr_info = uv.getaddrinfo(hostname) or {}
+  for _, value in ipairs(addr_info) do
+    if value.family == "inet" and value.protocol == "tcp" then
+      return value.addr
+    end
+  end
+  return ip_addr
+end
+
+function WebSocketClient:__connect_to_tcp(callback)
+  local ip_addr = self:__get_ipaddress()
+  if not ip_addr then
+    return self.__handlers.on_error("ENOTFOUND")
+  end
+  self.__tcp_client:connect(ip_addr, self.address.port, function(err)
+    if err then
+      return self.__handlers.on_error(err)
+    end
+    callback()
+  end)
+end
+
+function WebSocketClient:__read_start(callback)
+  self.__tcp_client:read_start(function(err, chunk)
+    if err then
+      return self.__handlers.on_error(err)
+    end
+    callback(chunk)
+  end)
 end
 
 return WebSocketClient
