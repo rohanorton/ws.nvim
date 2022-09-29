@@ -169,5 +169,30 @@ describe("WebSocketClient", function()
 
       eq("Success!", rx())
     end)
+    a.it("fails when handshake response key is bad", function()
+      local tx, rx = channel.oneshot()
+
+      server_listen_for_data(function()
+        client:write("HTTP/1.1 101 Switching Protocols\r\n")
+        client:write("Upgrade: websocket\r\n")
+        client:write("Connection: Upgrade\r\n")
+        client:write("Sec-WebSocket-Accept: derp\r\n")
+        client:write("\r\n")
+      end)
+
+      ws = WebSocketClient:new(server_url)
+
+      ws:on_error(function(err)
+        tx(err)
+      end)
+
+      ws:on_open(function()
+        tx("Connected! It shouldn't have!")
+      end)
+
+      ws:connect()
+
+      eq("ERROR", rx())
+    end)
   end)
 end)

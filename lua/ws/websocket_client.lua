@@ -46,7 +46,19 @@ local function get_ipaddress(hostname)
   end
 end
 
+function WebSocketClient:create_handshake()
+  local handshake = Handshake:new({
+    address = self.address,
+    websocket_key = WebSocketKey:create(),
+  })
+  handshake:on_success(self.__handlers.on_open)
+  handshake:on_error(self.__handlers.on_error)
+  return handshake
+end
+
 function WebSocketClient:connect()
+  local handshake = self:create_handshake()
+
   local ip_addr = get_ipaddress(self.address.host)
 
   if not ip_addr then
@@ -62,16 +74,10 @@ function WebSocketClient:connect()
       if err then
         return self.__handlers.on_error(err)
       end
-      if string.match(chunk, "HTTP/1.1 101 Switching Protocols\r\n") then
-        return self.__handlers.on_open()
-      end
-      return self.__handlers.on_error("ERROR")
+      handshake:handle_response(chunk)
     end)
 
-    Handshake:new({
-      address = self.address,
-      websocket_key = WebSocketKey:create(),
-    }):send(self.__tcp_client)
+    handshake:send(self.__tcp_client)
   end)
 end
 
