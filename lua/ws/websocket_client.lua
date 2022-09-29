@@ -1,6 +1,6 @@
 local Url = require("ws.url")
 local WebSocketKey = require("ws.websocket_key")
-local Handshake = require("ws.handshake")
+local OpeningHandshake = require("ws.opening_handshake")
 
 local uv = vim.loop
 
@@ -46,18 +46,18 @@ local function get_ipaddress(hostname)
   end
 end
 
-function WebSocketClient:create_handshake()
-  local handshake = Handshake:new({
+function WebSocketClient:create_opening_handshake()
+  local opening_handshake = OpeningHandshake:new({
     address = self.address,
     websocket_key = WebSocketKey:create(),
   })
-  handshake:on_success(self.__handlers.on_open)
-  handshake:on_error(self.__handlers.on_error)
-  return handshake
+  opening_handshake:on_success(self.__handlers.on_open)
+  opening_handshake:on_error(self.__handlers.on_error)
+  return opening_handshake
 end
 
 function WebSocketClient:connect()
-  local handshake = self:create_handshake()
+  local opening_handshake = self:create_opening_handshake()
 
   local ip_addr = get_ipaddress(self.address.host)
 
@@ -74,10 +74,10 @@ function WebSocketClient:connect()
       if err then
         return self.__handlers.on_error(err)
       end
-      handshake:handle_response(chunk)
+      opening_handshake:handle_response(chunk)
     end)
 
-    handshake:send(self.__tcp_client)
+    opening_handshake:send(self.__tcp_client)
   end)
 end
 

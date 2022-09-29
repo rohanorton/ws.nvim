@@ -2,9 +2,9 @@ local WebSocketKey = require("ws.websocket_key")
 
 local noop = function() end
 
-local Handshake = {}
+local OpeningHandshake = {}
 
-function Handshake:new(o)
+function OpeningHandshake:new(o)
   o = o or {}
   o.websocket_key = o.websocket_key or WebSocketKey:create()
   o.__handlers = {
@@ -16,15 +16,15 @@ function Handshake:new(o)
   return o
 end
 
-function Handshake:on_success(on_success)
+function OpeningHandshake:on_success(on_success)
   self.__handlers.on_success = on_success
 end
 
-function Handshake:on_error(on_error)
+function OpeningHandshake:on_error(on_error)
   self.__handlers.on_error = on_error
 end
 
-function Handshake:send(client)
+function OpeningHandshake:send(client)
   client:write("GET " .. self:path() .. " HTTP/1.1\r\n")
   client:write("Host: " .. self.address.host .. ":" .. self.address.port .. "\r\n")
   client:write("Upgrade: websocket\r\n")
@@ -34,7 +34,7 @@ function Handshake:send(client)
   client:write("\r\n")
 end
 
-function Handshake:handle_response(response)
+function OpeningHandshake:handle_response(response)
   -- Check is HTTP header
   local is_switching_header = string.match(response, "HTTP/1.1 101 Switching Protocols\r\n")
   if not is_switching_header then
@@ -54,8 +54,8 @@ function Handshake:handle_response(response)
   return self.__handlers.on_success()
 end
 
-function Handshake:path()
+function OpeningHandshake:path()
   return self.address.path or "/"
 end
 
-return Handshake
+return OpeningHandshake

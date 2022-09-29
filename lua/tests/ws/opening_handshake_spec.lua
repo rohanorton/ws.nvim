@@ -2,9 +2,9 @@ local spy = require("luassert.spy")
 
 local Url = require("ws.url")
 local WebSocketKey = require("ws.websocket_key")
-local Handshake = require("ws.handshake")
+local OpeningHandshake = require("ws.opening_handshake")
 
-describe("Handshake", function()
+describe("OpeningHandshake", function()
   describe(":send()", function()
     local s, mock_client
 
@@ -26,7 +26,7 @@ describe("Handshake", function()
         websocket_key = WebSocketKey:from("testkey123"),
       }
 
-      Handshake:new(args):send(mock_client)
+      OpeningHandshake:new(args):send(mock_client)
 
       check_written_to_client({
         "GET / HTTP/1.1\r\n",
@@ -44,7 +44,7 @@ describe("Handshake", function()
         --                                   ^^^^^
       }
 
-      Handshake:new(args):send(mock_client)
+      OpeningHandshake:new(args):send(mock_client)
 
       check_written_to_client({
         "GET /chat HTTP/1.1\r\n",
