@@ -15,11 +15,28 @@ describe("WebSocketClient", function()
       server:listen(128, cb)
     end
 
-    local function server_listen_for_data(cb)
+    local function server_listen_for_chunk(cb)
       server_listen_for_connection(function()
         client = uv.new_tcp()
         server:accept(client)
         client:read_start(cb)
+      end)
+    end
+
+    local function is_complete_http_header(str)
+      return string.match(str, "\r\n\r\n")
+    end
+
+    local function server_listen_for_data(cb)
+      local data = ""
+      server_listen_for_chunk(function(err, chunk)
+        if err then
+          return cb(err)
+        end
+        data = data .. chunk
+        if is_complete_http_header(data) then
+          cb(nil, data)
+        end
       end)
     end
 
@@ -105,8 +122,8 @@ describe("WebSocketClient", function()
     a.it("sends HTTP handshake", function()
       local tx, rx = channel.oneshot()
 
-      server_listen_for_data(function(err, chunk)
-        tx(err or chunk)
+      server_listen_for_data(function(err, data)
+        return err and tx(err) or tx(data)
       end)
 
       ws = WebSocketClient:new(server_url)
@@ -135,7 +152,7 @@ describe("WebSocketClient", function()
       local tx, rx = channel.oneshot()
 
       server_listen_for_data(function()
-        client:write("Not a valid response")
+        client:write("Not a valid response\r\n\r\n")
       end)
 
       ws = WebSocketClient:new(server_url)
@@ -146,17 +163,18 @@ describe("WebSocketClient", function()
 
       ws:connect()
 
-      eq("ERROR: Unexpected Response:\n\nNot a valid response", rx())
+      eq("ERROR: Unexpected Response:\n\nNot a valid response\r\n\r\n", rx())
     end)
+
     a.it("calls on_open when handshake successful", function()
       local tx, rx = channel.oneshot()
 
-      server_listen_for_data(function(err, chunk)
+      server_listen_for_data(function(err, data)
         if err then
           return tx(err)
         end
 
-        local client_key = string.match(chunk, "Sec%-WebSocket%-Key: (.-)\r\n")
+        local client_key = string.match(data, "Sec%-WebSocket%-Key: (.-)\r\n")
         local server_key = WebSocketKey:from(client_key):to_server_key()
 
         client:write("HTTP/1.1 101 Switching Protocols\r\n")
@@ -180,6 +198,7 @@ describe("WebSocketClient", function()
 
       eq("Success!", rx())
     end)
+
     a.it("fails when handshake response key is bad", function()
       local tx, rx = channel.oneshot()
 

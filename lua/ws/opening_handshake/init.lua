@@ -1,12 +1,13 @@
 local WebSocketKey = require("ws.websocket_key")
-
-local noop = function() end
+local noop = require("ws.util.noop")
+local Response = require("ws.opening_handshake.response")
 
 local OpeningHandshake = {}
 
 function OpeningHandshake:new(o)
   o = o or {}
   o.websocket_key = o.websocket_key or WebSocketKey:create()
+  o.__response = Response:new()
   o.__handlers = {
     on_success = noop,
     on_error = noop,
@@ -34,32 +35,38 @@ function OpeningHandshake:send(client)
   client:write("\r\n")
 end
 
-function OpeningHandshake:handle_response(response)
-  if not response then
-    return self.__handlers.on_error("ERROR: NULL Response")
+function OpeningHandshake:handle_response(chunk)
+  self.__response:append_chunk(chunk)
+  if self.__response:is_complete() then
+    self:__handle_complete_response()
   end
-
-  -- Check is HTTP header
-  local is_switching_header = string.match(response, "HTTP/1.1 101 Switching Protocols\r\n")
-  if not is_switching_header then
-    return self.__handlers.on_error("ERROR: Unexpected Response:\n\n" .. response)
-  end
-
-  -- Check server key is valid
-  local server_key = string.match(response, "Sec%-WebSocket%-Accept: (.-)\r\n")
-  if not server_key then
-    return self.__handlers.on_error("ERROR: No Server Key")
-  end
-  local valid_key = self.websocket_key:check_server_key(server_key)
-  if not valid_key then
-    return self.__handlers.on_error("ERROR: Invalid server key: " .. server_key)
-  end
-
-  return self.__handlers.on_success()
 end
 
 function OpeningHandshake:path()
   return self.address.path or "/"
+end
+
+-- PRIVATE --
+
+function OpeningHandshake:__check_server_key()
+  return self.websocket_key:check_server_key(self.__response:get_server_key())
+end
+
+function OpeningHandshake:__handle_complete_response()
+  -- Check is HTTP header
+  if not self.__response:is_valid_header() then
+    return self.__handlers.on_error("ERROR: Unexpected Response:\n\n" .. self.__response:to_string())
+  end
+
+  -- Check server key is valid
+  if not self.__response:get_server_key() then
+    return self.__handlers.on_error("ERROR: No Server Key")
+  end
+  if not self:__check_server_key() then
+    return self.__handlers.on_error("ERROR: Invalid server key: " .. self.__response:get_server_key())
+  end
+
+  return self.__handlers.on_success()
 end
 
 return OpeningHandshake
