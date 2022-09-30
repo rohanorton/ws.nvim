@@ -32,6 +32,10 @@ function Url.parse(addr)
   local _, end_dbl_slash = string.find(pathname, "//")
   end_dbl_slash = end_dbl_slash or 0
   local path = string.match(pathname, "/[%w%/]*", end_dbl_slash + 1)
+  -- Always include a path.
+  if not path then
+    path = "/"
+  end
 
   -- Get query
   local query = string.match(pathname, "?.*")

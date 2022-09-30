@@ -26,7 +26,7 @@ function OpeningHandshake:on_error(on_error)
 end
 
 function OpeningHandshake:send(client)
-  client:write("GET " .. self:path() .. " HTTP/1.1\r\n")
+  client:write("GET " .. self.address.path .. " HTTP/1.1\r\n")
   client:write("Host: " .. self.address.host .. ":" .. self.address.port .. "\r\n")
   client:write("Upgrade: websocket\r\n")
   client:write("Connection: Upgrade\r\n")
@@ -40,10 +40,6 @@ function OpeningHandshake:handle_response(chunk)
   if self.__response:is_complete() then
     self:__handle_complete_response()
   end
-end
-
-function OpeningHandshake:path()
-  return self.address.path or "/"
 end
 
 -- PRIVATE --
