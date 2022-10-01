@@ -70,27 +70,30 @@ function WebSocketClient:__create_opening_handshake()
 end
 
 function WebSocketClient:__get_ipaddress()
-  local hostname = self.address.host
-  local ip_addr
-  local addr_info = uv.getaddrinfo(hostname) or {}
+  local addr_info = uv.getaddrinfo(self.address.host) or {}
   for _, value in ipairs(addr_info) do
     if value.family == "inet" and value.protocol == "tcp" then
       return value.addr
     end
   end
-  return ip_addr
 end
 
-function WebSocketClient:__connect_to_tcp(callback)
+function WebSocketClient:__with_ipaddress(callback)
   local ip_addr = self:__get_ipaddress()
   if not ip_addr then
     return self.__handlers.on_error("ENOTFOUND")
   end
-  self.__tcp_client:connect(ip_addr, self.address.port, function(err)
-    if err then
-      return self.__handlers.on_error(err)
-    end
-    callback()
+  return callback(ip_addr)
+end
+
+function WebSocketClient:__connect_to_tcp(callback)
+  self:__with_ipaddress(function(ip_addr)
+    self.__tcp_client:connect(ip_addr, self.address.port, function(err)
+      if err then
+        return self.__handlers.on_error(err)
+      end
+      callback()
+    end)
   end)
 end
 
