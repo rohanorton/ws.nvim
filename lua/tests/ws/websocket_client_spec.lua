@@ -8,7 +8,7 @@ local WebSocketClient = require("ws.websocket_client")
 
 describe("WebSocketClient", function()
   describe(":connect()", function()
-    local ws, server, server_url, port, client
+    local ws, server, server_url, port, sock
 
     -- HELPERS --
     local function server_listen_for_connection(cb)
@@ -17,9 +17,9 @@ describe("WebSocketClient", function()
 
     local function server_listen_for_chunk(cb)
       server_listen_for_connection(function()
-        client = uv.new_tcp()
-        server:accept(client)
-        client:read_start(cb)
+        sock = uv.new_tcp()
+        server:accept(sock)
+        sock:read_start(cb)
       end)
     end
 
@@ -37,6 +37,25 @@ describe("WebSocketClient", function()
         if is_complete_http_header(data) then
           cb(nil, data)
         end
+      end)
+    end
+
+    local function connect_server(cb)
+      server_listen_for_data(function(err, data)
+        if err then
+          return cb(err)
+        end
+
+        local client_key = string.match(data, "Sec%-WebSocket%-Key: (.-)\r\n")
+        local server_key = WebSocketKey:from(client_key):to_server_key()
+
+        sock:write("HTTP/1.1 101 Switching Protocols\r\n")
+        sock:write("Upgrade: websocket\r\n")
+        sock:write("Connection: Upgrade\r\n")
+        sock:write("Sec-WebSocket-Accept: " .. server_key .. "\r\n")
+        sock:write("\r\n")
+        --
+        cb()
       end)
     end
 
@@ -58,11 +77,11 @@ describe("WebSocketClient", function()
 
     after_each(function()
       close_if_active(ws)
-      close_if_active(client)
+      close_if_active(sock)
       close_if_active(server)
       -- Unassign vars
       ws = nil
-      client = nil
+      sock = nil
       server = nil
     end)
 
@@ -152,7 +171,7 @@ describe("WebSocketClient", function()
       local tx, rx = channel.oneshot()
 
       server_listen_for_data(function()
-        client:write("Not a valid response\r\n\r\n")
+        sock:write("Not a valid response\r\n\r\n")
       end)
 
       ws = WebSocketClient:new(server_url)
@@ -177,11 +196,11 @@ describe("WebSocketClient", function()
         local client_key = string.match(data, "Sec%-WebSocket%-Key: (.-)\r\n")
         local server_key = WebSocketKey:from(client_key):to_server_key()
 
-        client:write("HTTP/1.1 101 Switching Protocols\r\n")
-        client:write("Upgrade: websocket\r\n")
-        client:write("Connection: Upgrade\r\n")
-        client:write("Sec-WebSocket-Accept: " .. server_key .. "\r\n")
-        client:write("\r\n")
+        sock:write("HTTP/1.1 101 Switching Protocols\r\n")
+        sock:write("Upgrade: websocket\r\n")
+        sock:write("Connection: Upgrade\r\n")
+        sock:write("Sec-WebSocket-Accept: " .. server_key .. "\r\n")
+        sock:write("\r\n")
       end)
 
       ws = WebSocketClient:new(server_url)
@@ -203,11 +222,11 @@ describe("WebSocketClient", function()
       local tx, rx = channel.oneshot()
 
       server_listen_for_data(function()
-        client:write("HTTP/1.1 101 Switching Protocols\r\n")
-        client:write("Upgrade: websocket\r\n")
-        client:write("Connection: Upgrade\r\n")
-        client:write("Sec-WebSocket-Accept: derp\r\n")
-        client:write("\r\n")
+        sock:write("HTTP/1.1 101 Switching Protocols\r\n")
+        sock:write("Upgrade: websocket\r\n")
+        sock:write("Connection: Upgrade\r\n")
+        sock:write("Sec-WebSocket-Accept: derp\r\n")
+        sock:write("\r\n")
       end)
 
       ws = WebSocketClient:new(server_url)
