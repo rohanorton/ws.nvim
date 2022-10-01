@@ -26,6 +26,8 @@ function OpeningHandshake:on_error(on_error)
 end
 
 function OpeningHandshake:send(client)
+  -- Request Line Format (RFC-2616)
+  -- Method SP Request-URI SP HTTP-Version CRLF
   client:write("GET " .. self.address.path .. " HTTP/1.1\r\n")
   client:write("Host: " .. self.address.host .. ":" .. self.address.port .. "\r\n")
   client:write("Upgrade: websocket\r\n")
@@ -50,7 +52,7 @@ end
 
 function OpeningHandshake:__handle_complete_response()
   -- Check is HTTP header
-  if not self.__response:is_valid_header() then
+  if not self.__response:is_valid_header_status_line() then
     return self.__handlers.on_error("ERROR: Unexpected Response:\n\n" .. self.__response:to_string())
   end
 

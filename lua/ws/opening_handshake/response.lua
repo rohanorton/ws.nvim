@@ -20,7 +20,10 @@ function Response:is_complete()
   return boolean(string.match(self.__value, "\r\n\r\n"))
 end
 
-function Response:is_valid_header()
+function Response:is_valid_header_status_line()
+  -- Status-Line format (RFC-2616)
+  -- HTTP-Version SP Status-Code SP Reason-Phrase CRLF
+  -- TODO: This currently does not deal with status codes other than 101 -- e.g 301
   return boolean(string.match(self.__value, "HTTP/1.1 101 Switching Protocols\r\n"))
 end
 
