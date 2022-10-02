@@ -1,7 +1,7 @@
 local Base64 = require("ws.base64")
 local Sha1 = require("ws.sha1")
 local Random = require("ws.random")
-local Utf8 = require("ws.utf8")
+local Bytes = require("ws.bytes")
 
 local MAGIC_STRING = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
@@ -19,7 +19,7 @@ end
 
 function WebSocketKey:create()
   local bytes = Random.bytes(16)
-  local byte_str = Utf8.from_bytes(bytes)
+  local byte_str = Bytes.to_string(bytes)
   local base64_str = Base64.encode(byte_str)
   return self:from(base64_str)
 end
