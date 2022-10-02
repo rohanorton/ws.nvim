@@ -5,6 +5,7 @@ local uv = vim.loop
 
 local WebSocketKey = require("ws.websocket_key")
 local WebSocketClient = require("ws.websocket_client")
+local Bytes = require("ws.bytes")
 
 describe("WebSocketClient", function()
   describe(":connect()", function()
@@ -27,35 +28,50 @@ describe("WebSocketClient", function()
       return string.match(str, "\r\n\r\n")
     end
 
-    local function server_listen_for_data(cb)
-      local data = ""
+    local function send_server_handshake(request_header)
+      local client_key = string.match(request_header, "Sec%-WebSocket%-Key: (.-)\r\n")
+      local server_key = WebSocketKey:from(client_key):to_server_key()
+
+      sock:write("HTTP/1.1 101 Switching Protocols\r\n")
+      sock:write("Upgrade: websocket\r\n")
+      sock:write("Connection: Upgrade\r\n")
+      sock:write("Sec-WebSocket-Accept: " .. server_key .. "\r\n")
+      sock:write("\r\n")
+    end
+
+    local function server_connect_and_send_ping(cb)
+      local received_handshake = false
+      local handshake = ""
       server_listen_for_chunk(function(err, chunk)
         if err then
           return cb(err)
         end
-        data = data .. chunk
-        if is_complete_http_header(data) then
-          cb(nil, data)
+        if not received_handshake then
+          handshake = handshake .. chunk
+          received_handshake = is_complete_http_header(handshake)
+          if received_handshake then
+            send_server_handshake(handshake)
+
+            -- Send ping
+            local frame = Bytes.to_string({ 0x89, 0x90, 0x00, 0x00, 0x00, 0x00, 0x00 })
+            sock:write(frame)
+          end
+        else
+          cb(nil, chunk)
         end
       end)
     end
 
-    local function connect_server(cb)
-      server_listen_for_data(function(err, data)
+    local function server_listen_for_client_handshake(cb)
+      local handshake = ""
+      server_listen_for_chunk(function(err, chunk)
         if err then
           return cb(err)
         end
-
-        local client_key = string.match(data, "Sec%-WebSocket%-Key: (.-)\r\n")
-        local server_key = WebSocketKey:from(client_key):to_server_key()
-
-        sock:write("HTTP/1.1 101 Switching Protocols\r\n")
-        sock:write("Upgrade: websocket\r\n")
-        sock:write("Connection: Upgrade\r\n")
-        sock:write("Sec-WebSocket-Accept: " .. server_key .. "\r\n")
-        sock:write("\r\n")
-        --
-        cb()
+        handshake = handshake .. chunk
+        if is_complete_http_header(handshake) then
+          cb(nil, handshake)
+        end
       end)
     end
 
@@ -141,7 +157,7 @@ describe("WebSocketClient", function()
     a.it("sends HTTP handshake", function()
       local tx, rx = channel.oneshot()
 
-      server_listen_for_data(function(err, data)
+      server_listen_for_client_handshake(function(err, data)
         return err and tx(err) or tx(data)
       end)
 
@@ -170,7 +186,7 @@ describe("WebSocketClient", function()
     a.it("fails on malformed handshake response", function()
       local tx, rx = channel.oneshot()
 
-      server_listen_for_data(function()
+      server_listen_for_client_handshake(function()
         sock:write("Not a valid response\r\n\r\n")
       end)
 
@@ -188,19 +204,11 @@ describe("WebSocketClient", function()
     a.it("calls on_open when handshake successful", function()
       local tx, rx = channel.oneshot()
 
-      server_listen_for_data(function(err, data)
+      server_listen_for_client_handshake(function(err, req_header)
         if err then
           return tx(err)
         end
-
-        local client_key = string.match(data, "Sec%-WebSocket%-Key: (.-)\r\n")
-        local server_key = WebSocketKey:from(client_key):to_server_key()
-
-        sock:write("HTTP/1.1 101 Switching Protocols\r\n")
-        sock:write("Upgrade: websocket\r\n")
-        sock:write("Connection: Upgrade\r\n")
-        sock:write("Sec-WebSocket-Accept: " .. server_key .. "\r\n")
-        sock:write("\r\n")
+        send_server_handshake(req_header)
       end)
 
       ws = WebSocketClient:new(server_url)
@@ -221,7 +229,7 @@ describe("WebSocketClient", function()
     a.it("fails when handshake response key is bad", function()
       local tx, rx = channel.oneshot()
 
-      server_listen_for_data(function()
+      server_listen_for_client_handshake(function()
         sock:write("HTTP/1.1 101 Switching Protocols\r\n")
         sock:write("Upgrade: websocket\r\n")
         sock:write("Connection: Upgrade\r\n")
@@ -242,6 +250,39 @@ describe("WebSocketClient", function()
       ws:connect()
 
       eq("ERROR: Invalid server key: derp", rx())
+    end)
+
+    a.it("responds to server's ping with a pong", function()
+      local tx, rx = channel.oneshot()
+
+      server_connect_and_send_ping(function(err, chunk)
+        if err then
+          return tx(err)
+        end
+        -- Pong received?
+        local bytes = Bytes.from_string(chunk)
+        local first_byte = bytes[1]
+        local is_pong = first_byte == 0x8A
+        if is_pong then
+          tx("pong received")
+        else
+          tx("Expected first byte to be 0x8A but received " .. (string.format("0x%02X", first_byte) or ""))
+        end
+      end)
+
+      ws = WebSocketClient:new(server_url)
+
+      ws:on_error(function(err)
+        tx(err)
+      end)
+
+      ws:on_message(function(msg)
+        tx(msg)
+      end)
+
+      ws:connect()
+
+      eq("pong received", rx())
     end)
   end)
 end)

@@ -1,6 +1,7 @@
 local Url = require("ws.url")
 local WebSocketKey = require("ws.websocket_key")
 local OpeningHandshake = require("ws.opening_handshake")
+local Bytes = require("ws.bytes")
 
 local uv = vim.loop
 
@@ -41,13 +42,20 @@ function WebSocketClient:connect()
   self:__connect_to_tcp(function()
     local opening_handshake = self:__create_opening_handshake()
     self:__read_start(function(chunk)
-      opening_handshake:handle_response(chunk)
+      if opening_handshake:is_complete() then
+        local pong = Bytes.to_string({ 0x8A })
+        self:send(pong)
+      else
+        opening_handshake:handle_response(chunk)
+      end
     end)
     opening_handshake:send(self.__tcp_client)
   end)
 end
 
-function WebSocketClient:send(_) end
+function WebSocketClient:send(data)
+  self.__tcp_client:write(data)
+end
 
 function WebSocketClient:close()
   self.__tcp_client:close()

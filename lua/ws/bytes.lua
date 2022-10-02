@@ -8,4 +8,13 @@ function Bytes.to_string(bytes)
   return table.concat(str_arr)
 end
 
+function Bytes.from_string(str)
+  local byte_arr = {}
+  for i = 1, string.len(str) do
+    local char = (string.sub(str, i, i))
+    table.insert(byte_arr, string.byte(char))
+  end
+  return byte_arr
+end
+
 return Bytes
