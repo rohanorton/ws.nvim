@@ -6,7 +6,6 @@ local OpeningHandshake = {}
 
 function OpeningHandshake:new(o)
   o = o or {}
-  o.__handshake_received = false
   o.websocket_key = o.websocket_key or WebSocketKey:create()
   o.__response = Response:new()
   o.__handlers = {
@@ -45,9 +44,6 @@ function OpeningHandshake:handle_response(chunk)
   end
 end
 
-function OpeningHandshake:is_complete()
-  return self.__handshake_received
-end
 -- PRIVATE --
 
 function OpeningHandshake:__check_server_key()
@@ -68,7 +64,6 @@ function OpeningHandshake:__handle_complete_response()
     return self.__handlers.on_error("ERROR: Invalid server key: " .. self.__response:get_server_key())
   end
 
-  self.__handshake_received = true
   return self.__handlers.on_success()
 end
 

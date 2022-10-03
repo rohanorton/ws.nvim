@@ -7,10 +7,18 @@ local uv = vim.loop
 
 local noop = function() end
 
+-- Ready State Enum --
+local CONNECTING = 0
+local OPEN = 1
+local CLOSING = 2
+local CLOSED = 3
+
 local function WebSocketClient(address)
   local self = {}
 
   address = Url.parse(address)
+
+  local ready_state = CLOSED
 
   local tcp_client = uv.new_tcp()
 
@@ -22,13 +30,23 @@ local function WebSocketClient(address)
     on_message = noop,
   }
 
+  local function set_open_state()
+    ready_state = OPEN
+    handlers.on_open()
+  end
+
+  local function emit_error_and_close(err)
+    handlers.on_error(err)
+    self.close()
+  end
+
   local function create_opening_handshake()
     local opening_handshake = OpeningHandshake:new({
       address = address,
       websocket_key = WebSocketKey:create(),
     })
-    opening_handshake:on_success(handlers.on_open)
-    opening_handshake:on_error(handlers.on_error)
+    opening_handshake:on_success(set_open_state)
+    opening_handshake:on_error(emit_error_and_close)
     return opening_handshake
   end
 
@@ -44,14 +62,9 @@ local function WebSocketClient(address)
   local function with_ipaddress(callback)
     local ip_addr = get_ipaddress()
     if not ip_addr then
-      return handlers.on_error("ENOTFOUND")
+      return emit_error_and_close("ENOTFOUND")
     end
     return callback(ip_addr)
-  end
-
-  local function emit_error_and_close(err)
-    handlers.on_error(err)
-    self.close()
   end
 
   local function connect_to_tcp(callback)
@@ -68,7 +81,7 @@ local function WebSocketClient(address)
   local function read_start(callback)
     tcp_client:read_start(function(err, chunk)
       if err then
-        return handlers.on_error(err)
+        return emit_error_and_close(err)
       end
       callback(chunk)
     end)
@@ -99,10 +112,11 @@ local function WebSocketClient(address)
   function self.on_message(_) end
 
   function self.connect()
+    ready_state = CONNECTING
     connect_to_tcp(function()
       local opening_handshake = create_opening_handshake()
       read_start(function(chunk)
-        if opening_handshake:is_complete() then
+        if ready_state == OPEN then
           send_pong()
         else
           opening_handshake:handle_response(chunk)
@@ -115,7 +129,10 @@ local function WebSocketClient(address)
   function self.send(_) end
 
   function self.close()
+    ready_state = CLOSING
+    -- TODO: This should start a closing handshake, but for now ...
     tcp_client:close()
+    ready_state = CLOSED
   end
 
   function self.is_active()
