@@ -55,4 +55,32 @@ describe("Receiver", function()
 
     assert(complete, "Test did not complete!")
   end)
+
+  it("parses a close message", function()
+    local complete = false
+    receiver:on_conclude(function(code, data)
+      eq(1005, code)
+      eq(Bytes.from_string(""), data)
+      complete = true
+    end)
+
+    local buffer = Bytes.to_string({ 0x88, 0x00 })
+    receiver:write(buffer)
+
+    assert(complete, "Test did not complete!")
+  end)
+
+  it("parses a close message spanning multiple writes", function()
+    local complete = false
+    receiver:on_conclude(function(code, data)
+      eq(1005, code)
+      eq(Bytes.from_string("DONE"), data)
+      complete = true
+    end)
+
+    receiver:write(Bytes.to_string({ 0x88, 0x06 }))
+    receiver:write(Bytes.to_string({ 0x03, 0xE8, 0x44, 0x4F, 0x4E, 0x45 }))
+
+    assert(complete, "Test did not complete!")
+  end)
 end)
