@@ -10,6 +10,7 @@ local uv = vim.loop
 local function WebSocketClient(address)
   local self = {}
   local receiver
+  local last_chunk
 
   address = Url.parse(address)
 
@@ -29,9 +30,23 @@ local function WebSocketClient(address)
     return rec
   end
 
+  -- HACK: Sometimes frames are sent before handshake has been fully
+  -- received. We need to send the remaining data to the new receiver.
+  local function receive_remnant()
+    if last_chunk then
+      local end_of_header = string.find(last_chunk, "\r\n\r\n")
+      local remnant = (string.sub(last_chunk, end_of_header + 4))
+      if string.len(remnant) > 0 then
+        receiver:write(remnant)
+      end
+      last_chunk = nil
+    end
+  end
+
   local function set_open_state()
     receiver = create_receiver()
     emitter.emit("open")
+    receive_remnant()
   end
 
   local function emit_error_and_close(err)
@@ -86,6 +101,14 @@ local function WebSocketClient(address)
     end)
   end
 
+  local function receive()
+    read_start(function(chunk)
+      if chunk then
+        last_chunk = chunk
+        receiver:write(chunk)
+      end
+    end)
+  end
   -- PUBLIC --
 
   function self.on_open(handler)
@@ -103,12 +126,10 @@ local function WebSocketClient(address)
   function self.connect()
     connect_to_tcp(function()
       local opening_handshake = create_opening_handshake()
-      -- Receiver is replaced with another once handshake complete
-      receiver = opening_handshake
-      read_start(function(chunk)
-        receiver:write(chunk)
-      end)
       opening_handshake:send(tcp_client)
+      -- Receiver is replaced once handshake complete
+      receiver = opening_handshake
+      receive()
     end)
   end
 
