@@ -29,7 +29,7 @@ function Receiver:new()
     buffers = Buffers(),
     __emitter = Emitter(),
     state = GET_INFO,
-    __data = {},
+    data = {},
   }
   setmetatable(o, self)
   self.__index = self
@@ -49,6 +49,12 @@ function Receiver:get_info()
   self.op_code = Bit.band(buf[1], 0x0f)
   self.payload_length = Bit.band(buf[2], 0x7f)
   self.is_masked = Bit.band(buf[2], 0x80) == 0x80
+
+  self.state = self.is_masked and GET_MASK or GET_DATA
+end
+
+function Receiver:get_mask()
+  self.mask = self.buffers.consume(4)
   self.state = GET_DATA
 end
 
@@ -58,7 +64,10 @@ function Receiver:get_data()
       self.__loop = false
       return
     end
-    self.__data = self.buffers.consume(self.payload_length)
+    self.data = self.buffers.consume(self.payload_length)
+    if self.is_masked then
+      self:unmask(self.data, self.mask)
+    end
   end
 
   if self.op_code > 0x07 then
@@ -68,9 +77,15 @@ function Receiver:get_data()
   self:data_message()
 end
 
+function Receiver:unmask(buffer, mask)
+  for i = 1, #buffer do
+    buffer[i] = Bit.bxor(buffer[i], mask[Bit.band(i - 1, 3) + 1])
+  end
+end
+
 function Receiver:data_message()
-  if self.__data then
-    self.__emitter.emit("message", self.__data, false)
+  if self.data then
+    self.__emitter.emit("message", self.data, false)
   end
 
   self.state = GET_INFO
@@ -78,7 +93,7 @@ end
 
 function Receiver:control_message()
   if self.op_code == OP.CONN_CLOSE then
-    local buf = self.__data
+    local buf = self.data
     buf = table_slice(buf, 3) -- WHYYY?!?!??!
     self.__emitter.emit("conclude", 1005, buf)
   elseif self.op_code == OP.PING then
@@ -97,13 +112,13 @@ function Receiver:write(chunk)
   self:start_loop()
 end
 
-function Receiver:get_current_step() end
-
 function Receiver:start_loop()
   self.__loop = true
   while self.__loop do
     if self.state == GET_INFO then
       self:get_info()
+    elseif self.state == GET_MASK then
+      self:get_mask()
     elseif self.state == GET_DATA then
       self:get_data()
     else

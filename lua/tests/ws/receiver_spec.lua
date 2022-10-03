@@ -83,4 +83,26 @@ describe("Receiver", function()
 
     assert(complete, "Test did not complete!")
   end)
+
+  it("parses a masked text message", function()
+    local complete = false
+    receiver:on_message(function(data, is_binary)
+      eq(Bytes.from_string('5:::{"name":"echo"}'), data)
+      assert(not is_binary, "Should receive non-binary data")
+      complete = true
+    end)
+
+    -- stylua: ignore
+    local buf = Bytes.to_string({
+      0x81, 0x93, 0x34, 0x83, 0xA8,
+      0x68, 0x01, 0xB9, 0x92, 0x52,
+      0x4F, 0xA1, 0xC6, 0x09, 0x59,
+      0xE6, 0x8A, 0x52, 0x16, 0xE6,
+      0xCB, 0x00, 0x5B, 0xA1, 0xD5,
+    })
+
+    receiver:write(buf)
+
+    assert(complete, "Test did not complete!")
+  end)
 end)
