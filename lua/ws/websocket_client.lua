@@ -74,6 +74,16 @@ local function WebSocketClient(address)
     end)
   end
 
+  local function send_frame(frame)
+    local str = Bytes.to_string(frame)
+    tcp_client:write(str)
+  end
+
+  local function send_pong()
+    local pong = { 0x8A }
+    send_frame(pong)
+  end
+
   -- PUBLIC --
 
   function self.on_open(on_open)
@@ -93,8 +103,7 @@ local function WebSocketClient(address)
       local opening_handshake = create_opening_handshake()
       read_start(function(chunk)
         if opening_handshake:is_complete() then
-          local pong = Bytes.to_string({ 0x8A })
-          self.send(pong)
+          send_pong()
         else
           opening_handshake:handle_response(chunk)
         end
@@ -103,9 +112,7 @@ local function WebSocketClient(address)
     end)
   end
 
-  function self.send(data)
-    tcp_client:write(data)
-  end
+  function self.send(_) end
 
   function self.close()
     tcp_client:close()
