@@ -27,6 +27,9 @@ local function WebSocketClient(address)
   local function create_receiver()
     local rec = Receiver:new()
     rec:on_ping(send_pong)
+    rec:on_message(function(msg, is_binary)
+      emitter.emit("message", msg, is_binary)
+    end)
     return rec
   end
 
@@ -121,7 +124,9 @@ local function WebSocketClient(address)
     emitter.on("error", handler)
   end
 
-  function self.on_message(_) end
+  function self.on_message(handler)
+    emitter.on("message", handler)
+  end
 
   function self.connect()
     connect_to_tcp(function()

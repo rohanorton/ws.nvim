@@ -39,7 +39,7 @@ describe("WebSocketClient", function()
       sock:write("\r\n")
     end
 
-    local function server_connect_and_send_ping(callback)
+    local function server_connect_and_send(frame, callback)
       local received_handshake = false
       local handshake = ""
       server_listen_for_chunk(function(err, chunk)
@@ -51,9 +51,6 @@ describe("WebSocketClient", function()
           received_handshake = is_complete_http_header(handshake)
           if received_handshake then
             send_server_handshake(handshake)
-
-            -- Send ping
-            local frame = Bytes.to_string({ 0x89, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00 })
             sock:write(frame)
           end
         else
@@ -255,7 +252,8 @@ describe("WebSocketClient", function()
     a.it("responds to server's ping with a pong", function()
       local tx, rx = channel.oneshot()
 
-      server_connect_and_send_ping(function(err, chunk)
+      local ping = Bytes.to_string({ 0x89, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00 })
+      server_connect_and_send(ping, function(err, chunk)
         if err then
           return tx(err)
         end
@@ -283,6 +281,34 @@ describe("WebSocketClient", function()
       ws.connect()
 
       eq("pong received", rx())
+    end)
+
+    a.it("receives messages from the server", function()
+      local tx, rx = channel.oneshot()
+
+      -- Unmasked message containing "Hello"
+      local hello = Bytes.to_string({ 0x81, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f })
+      server_connect_and_send(hello, function(err)
+        if err then
+          return tx(err)
+        end
+      end)
+
+      ws = WebSocketClient(server_url)
+
+      ws.on_error(function(err)
+        tx(err)
+      end)
+
+      ws.on_message(function(buffer, is_binary)
+        assert(not is_binary, "Received binary data")
+        local msg = Bytes.to_string(buffer)
+        tx("Received message: " .. msg)
+      end)
+
+      ws.connect()
+
+      eq("Received message: Hello", rx())
     end)
   end)
 end)
