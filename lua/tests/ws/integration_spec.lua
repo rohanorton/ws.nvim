@@ -12,23 +12,23 @@ a.describe("Integration Test", function()
       local has_received_data = false
 
       -- Setup client to connect to websocket echo server.
-      local ws = WebSocketClient:new("ws://websocket-echo.com/")
+      local ws = WebSocketClient("ws://websocket-echo.com/")
 
       -- Setup Handlers.
-      ws:on_open(function()
-        ws:send("hello")
+      ws.on_open(function()
+        ws.send("hello")
       end)
 
-      ws:on_close(function()
+      ws.on_close(function()
         assert.is_true(has_received_data, "Websocket closed before any data received.")
         tx(true)
       end)
 
-      ws:on_error(function(err)
+      ws.on_error(function(err)
         tx(err)
       end)
 
-      ws:on_message(function(msg)
+      ws.on_message(function(msg)
         has_received_data = true
         assert.is_equal(msg, "hello")
         -- Close server on successful message
@@ -36,7 +36,7 @@ a.describe("Integration Test", function()
       end)
 
       -- Connect to server.
-      ws:connect()
+      ws.connect()
 
       assert.is_equal(rx(), true)
     end)

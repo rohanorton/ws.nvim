@@ -8,19 +8,19 @@ local WebSocketClient = require("ws.websocket_client")
 local Bytes = require("ws.bytes")
 
 describe("WebSocketClient", function()
-  describe(":connect()", function()
+  describe(".connect()", function()
     local ws, server, server_url, port, sock
 
     -- HELPERS --
-    local function server_listen_for_connection(cb)
-      server:listen(128, cb)
+    local function server_listen_for_connection(callback)
+      server:listen(128, callback)
     end
 
-    local function server_listen_for_chunk(cb)
+    local function server_listen_for_chunk(callback)
       server_listen_for_connection(function()
         sock = uv.new_tcp()
         server:accept(sock)
-        sock:read_start(cb)
+        sock:read_start(callback)
       end)
     end
 
@@ -39,12 +39,12 @@ describe("WebSocketClient", function()
       sock:write("\r\n")
     end
 
-    local function server_connect_and_send_ping(cb)
+    local function server_connect_and_send_ping(callback)
       local received_handshake = false
       local handshake = ""
       server_listen_for_chunk(function(err, chunk)
         if err then
-          return cb(err)
+          return callback(err)
         end
         if not received_handshake then
           handshake = handshake .. chunk
@@ -57,20 +57,20 @@ describe("WebSocketClient", function()
             sock:write(frame)
           end
         else
-          cb(nil, chunk)
+          callback(nil, chunk)
         end
       end)
     end
 
-    local function server_listen_for_client_handshake(cb)
+    local function server_listen_for_client_handshake(callback)
       local handshake = ""
       server_listen_for_chunk(function(err, chunk)
         if err then
-          return cb(err)
+          return callback(err)
         end
         handshake = handshake .. chunk
         if is_complete_http_header(handshake) then
-          cb(nil, handshake)
+          callback(nil, handshake)
         end
       end)
     end
@@ -109,7 +109,7 @@ describe("WebSocketClient", function()
         tx("Success!") -- Succeed on server access
       end)
 
-      WebSocketClient:new(server_url):connect()
+      WebSocketClient(server_url).connect()
       eq(rx(), "Success!")
     end)
 
@@ -121,11 +121,11 @@ describe("WebSocketClient", function()
       end)
 
       local server_url_with_domain = "ws://localhost:" .. port
-      ws = WebSocketClient:new(server_url_with_domain)
-      ws:on_error(function(err)
+      ws = WebSocketClient(server_url_with_domain)
+      ws.on_error(function(err)
         tx(err)
       end)
-      ws:connect()
+      ws.connect()
       eq("Success!", rx())
     end)
 
@@ -135,22 +135,22 @@ describe("WebSocketClient", function()
       -- Close server before connecting, so we know that address is empty
       server:close()
 
-      ws = WebSocketClient:new(server_url)
-      ws:on_error(function(err)
+      ws = WebSocketClient(server_url)
+      ws.on_error(function(err)
         tx(err)
       end)
-      ws:connect()
+      ws.connect()
       eq("ECONNREFUSED", rx())
     end)
 
     a.it("fails with ENOTFOUND if cannot find IP address", function()
       local tx, rx = channel.oneshot()
 
-      ws = WebSocketClient:new("ws://a-nonexistent-domain")
-      ws:on_error(function(err)
+      ws = WebSocketClient("ws://a-nonexistent-domain")
+      ws.on_error(function(err)
         tx(err)
       end)
-      ws:connect()
+      ws.connect()
       eq("ENOTFOUND", rx())
     end)
 
@@ -161,13 +161,13 @@ describe("WebSocketClient", function()
         return err and tx(err) or tx(data)
       end)
 
-      ws = WebSocketClient:new(server_url)
+      ws = WebSocketClient(server_url)
 
-      ws:on_error(function(err)
+      ws.on_error(function(err)
         tx(err)
       end)
 
-      ws:connect()
+      ws.connect()
 
       local handshake_pattern = ""
         .. "GET / HTTP/1.1\r\n"
@@ -190,13 +190,13 @@ describe("WebSocketClient", function()
         sock:write("Not a valid response\r\n\r\n")
       end)
 
-      ws = WebSocketClient:new(server_url)
+      ws = WebSocketClient(server_url)
 
-      ws:on_error(function(err)
+      ws.on_error(function(err)
         tx(err)
       end)
 
-      ws:connect()
+      ws.connect()
 
       eq("ERROR: Unexpected Response:\n\nNot a valid response\r\n\r\n", rx())
     end)
@@ -211,17 +211,17 @@ describe("WebSocketClient", function()
         send_server_handshake(req_header)
       end)
 
-      ws = WebSocketClient:new(server_url)
+      ws = WebSocketClient(server_url)
 
-      ws:on_error(function(err)
+      ws.on_error(function(err)
         tx(err)
       end)
 
-      ws:on_open(function()
+      ws.on_open(function()
         tx("Success!")
       end)
 
-      ws:connect()
+      ws.connect()
 
       eq("Success!", rx())
     end)
@@ -237,17 +237,17 @@ describe("WebSocketClient", function()
         sock:write("\r\n")
       end)
 
-      ws = WebSocketClient:new(server_url)
+      ws = WebSocketClient(server_url)
 
-      ws:on_error(function(err)
+      ws.on_error(function(err)
         tx(err)
       end)
 
-      ws:on_open(function()
+      ws.on_open(function()
         tx("Connected! It shouldn't have!")
       end)
 
-      ws:connect()
+      ws.connect()
 
       eq("ERROR: Invalid server key: derp", rx())
     end)
@@ -270,17 +270,17 @@ describe("WebSocketClient", function()
         end
       end)
 
-      ws = WebSocketClient:new(server_url)
+      ws = WebSocketClient(server_url)
 
-      ws:on_error(function(err)
+      ws.on_error(function(err)
         tx(err)
       end)
 
-      ws:on_message(function(msg)
+      ws.on_message(function(msg)
         tx(msg)
       end)
 
-      ws:connect()
+      ws.connect()
 
       eq("pong received", rx())
     end)
