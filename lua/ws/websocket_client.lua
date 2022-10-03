@@ -25,7 +25,7 @@ local function WebSocketClient(address)
 
   local function create_receiver()
     local rec = Receiver:new()
-    rec:on("ping", send_pong)
+    rec:on_ping(send_pong)
     return rec
   end
 

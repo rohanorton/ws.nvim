@@ -53,7 +53,7 @@ describe("WebSocketClient", function()
             send_server_handshake(handshake)
 
             -- Send ping
-            local frame = Bytes.to_string({ 0x89, 0x90, 0x00, 0x00, 0x00, 0x00, 0x00 })
+            local frame = Bytes.to_string({ 0x89, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00 })
             sock:write(frame)
           end
         else
@@ -277,7 +277,7 @@ describe("WebSocketClient", function()
       end)
 
       ws.on_message(function(msg)
-        tx(msg)
+        tx("Received message")
       end)
 
       ws.connect()
