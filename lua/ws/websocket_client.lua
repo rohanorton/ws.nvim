@@ -1,42 +1,41 @@
 local Url = require("ws.url")
 local WebSocketKey = require("ws.websocket_key")
 local OpeningHandshake = require("ws.opening_handshake")
+local Receiver = require("ws.receiver")
 local Bytes = require("ws.bytes")
+local Emitter = require("ws.emitter")
 
 local uv = vim.loop
 
-local noop = function() end
-
--- Ready State Enum --
-local CONNECTING = 0
-local OPEN = 1
-local CLOSING = 2
-local CLOSED = 3
-
 local function WebSocketClient(address)
   local self = {}
+  local receiver
 
   address = Url.parse(address)
 
-  local ready_state = CLOSED
-
   local tcp_client = uv.new_tcp()
 
-  local handlers = {
-    -- Null handlers
-    on_error = noop,
-    on_open = noop,
-    on_close = noop,
-    on_message = noop,
-  }
+  local emitter = Emitter()
+
+  local function send_pong()
+    local pong_frame = { 0x8A }
+    local str = Bytes.to_string(pong_frame)
+    tcp_client:write(str)
+  end
+
+  local function create_receiver()
+    local rec = Receiver:new()
+    rec:on("ping", send_pong)
+    return rec
+  end
 
   local function set_open_state()
-    ready_state = OPEN
-    handlers.on_open()
+    receiver = create_receiver()
+    emitter.emit("open")
   end
 
   local function emit_error_and_close(err)
-    handlers.on_error(err)
+    emitter.emit("error", err)
     self.close()
   end
 
@@ -87,40 +86,27 @@ local function WebSocketClient(address)
     end)
   end
 
-  local function send_frame(frame)
-    local str = Bytes.to_string(frame)
-    tcp_client:write(str)
-  end
-
-  local function send_pong()
-    local pong = { 0x8A }
-    send_frame(pong)
-  end
-
   -- PUBLIC --
 
-  function self.on_open(on_open)
-    handlers.on_open = on_open
+  function self.on_open(handler)
+    emitter.on("open", handler)
   end
 
   function self.on_close(_) end
 
-  function self.on_error(on_error)
-    handlers.on_error = on_error
+  function self.on_error(handler)
+    emitter.on("error", handler)
   end
 
   function self.on_message(_) end
 
   function self.connect()
-    ready_state = CONNECTING
     connect_to_tcp(function()
       local opening_handshake = create_opening_handshake()
+      -- Receiver is replaced with another once handshake complete
+      receiver = opening_handshake
       read_start(function(chunk)
-        if ready_state == OPEN then
-          send_pong()
-        else
-          opening_handshake:handle_response(chunk)
-        end
+        receiver:write(chunk)
       end)
       opening_handshake:send(tcp_client)
     end)
@@ -129,10 +115,8 @@ local function WebSocketClient(address)
   function self.send(_) end
 
   function self.close()
-    ready_state = CLOSING
     -- TODO: This should start a closing handshake, but for now ...
     tcp_client:close()
-    ready_state = CLOSED
   end
 
   function self.is_active()

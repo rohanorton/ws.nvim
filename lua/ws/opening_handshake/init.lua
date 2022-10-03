@@ -1,5 +1,5 @@
 local WebSocketKey = require("ws.websocket_key")
-local noop = require("ws.util.noop")
+local Emitter = require("ws.emitter")
 local Response = require("ws.opening_handshake.response")
 
 local OpeningHandshake = {}
@@ -8,21 +8,23 @@ function OpeningHandshake:new(o)
   o = o or {}
   o.websocket_key = o.websocket_key or WebSocketKey:create()
   o.__response = Response:new()
-  o.__handlers = {
-    on_success = noop,
-    on_error = noop,
-  }
+  o.__emitter = Emitter()
+
   setmetatable(o, self)
   self.__index = self
   return o
 end
 
-function OpeningHandshake:on_success(on_success)
-  self.__handlers.on_success = on_success
+function OpeningHandshake:on_success(handler)
+  self:on("success", handler)
 end
 
-function OpeningHandshake:on_error(on_error)
-  self.__handlers.on_error = on_error
+function OpeningHandshake:on_error(handler)
+  self:on("error", handler)
+end
+
+function OpeningHandshake:on(evt, handler)
+  self.__emitter.on(evt, handler)
 end
 
 function OpeningHandshake:send(client)
@@ -37,7 +39,7 @@ function OpeningHandshake:send(client)
   client:write("\r\n")
 end
 
-function OpeningHandshake:handle_response(chunk)
+function OpeningHandshake:write(chunk)
   self.__response:append_chunk(chunk)
   if self.__response:is_complete() then
     self:__handle_complete_response()
@@ -53,18 +55,18 @@ end
 function OpeningHandshake:__handle_complete_response()
   -- Check is HTTP header
   if not self.__response:is_valid_header_status_line() then
-    return self.__handlers.on_error("ERROR: Unexpected Response:\n\n" .. self.__response:to_string())
+    return self.__emitter.emit("error", "ERROR: Unexpected Response:\n\n" .. self.__response:to_string())
   end
 
   -- Check server key is valid
   if not self.__response:get_server_key() then
-    return self.__handlers.on_error("ERROR: No Server Key")
+    return self.__emitter.emit("error", "ERROR: No Server Key")
   end
   if not self:__check_server_key() then
-    return self.__handlers.on_error("ERROR: Invalid server key: " .. self.__response:get_server_key())
+    return self.__emitter.emit("error", "ERROR: Invalid server key: " .. self.__response:get_server_key())
   end
 
-  return self.__handlers.on_success()
+  return self.__emitter.emit("success")
 end
 
 return OpeningHandshake
