@@ -49,11 +49,16 @@ local function WebSocketClient(address)
     return callback(ip_addr)
   end
 
+  local function emit_error_and_close(err)
+    handlers.on_error(err)
+    self.close()
+  end
+
   local function connect_to_tcp(callback)
     with_ipaddress(function(ip_addr)
       tcp_client:connect(ip_addr, address.port, function(err)
         if err then
-          return handlers.on_error(err)
+          return emit_error_and_close(err)
         end
         callback()
       end)
