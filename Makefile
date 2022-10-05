@@ -31,6 +31,10 @@ test.sha1: # Runs sha1 test
 	$(call run_test, lua/tests/ws/sha1_spec.lua)
 .PHONY: test.sha1
 
+test.buffer: # Runs buffer test
+	$(call run_test, lua/tests/ws/buffer_spec.lua)
+.PHONY: test.buffer
+
 test.receiver: # Runs receiver test
 	$(call run_test, lua/tests/ws/receiver_spec.lua)
 .PHONY: test.receiver
