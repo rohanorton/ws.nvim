@@ -1,6 +1,7 @@
 local Url = require("ws.url")
 local WebSocketKey = require("ws.websocket_key")
-local OpeningHandshake = require("ws.opening_handshake")
+local OpeningHandshakeSender = require("ws.opening_handshake_sender")
+local OpeningHandshakeReceiver = require("ws.opening_handshake_receiver")
 local Receiver = require("ws.receiver")
 local Bytes = require("ws.bytes")
 local Emitter = require("ws.emitter")
@@ -13,6 +14,12 @@ local function WebSocketClient(address)
   local last_chunk
 
   address = Url.parse(address)
+  local websocket_key = WebSocketKey:create()
+
+  local opening_handshake_sender = OpeningHandshakeSender:new({
+    websocket_key = websocket_key,
+    address = address,
+  })
 
   local tcp_client = uv.new_tcp()
 
@@ -57,14 +64,13 @@ local function WebSocketClient(address)
     self.close()
   end
 
-  local function create_opening_handshake()
-    local opening_handshake = OpeningHandshake:new({
-      address = address,
-      websocket_key = WebSocketKey:create(),
+  local function create_opening_handshake_receiver()
+    local rec = OpeningHandshakeReceiver:new({
+      websocket_key = websocket_key,
     })
-    opening_handshake:on_success(set_open_state)
-    opening_handshake:on_error(emit_error_and_close)
-    return opening_handshake
+    rec:on_success(set_open_state)
+    rec:on_error(emit_error_and_close)
+    return rec
   end
 
   local function get_ipaddress()
@@ -130,10 +136,9 @@ local function WebSocketClient(address)
 
   function self.connect()
     connect_to_tcp(function()
-      local opening_handshake = create_opening_handshake()
-      opening_handshake:send(tcp_client)
+      opening_handshake_sender:send(tcp_client)
       -- Receiver is replaced once handshake complete
-      receiver = opening_handshake
+      receiver = create_opening_handshake_receiver()
       receive()
     end)
   end
