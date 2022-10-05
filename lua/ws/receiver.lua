@@ -1,5 +1,5 @@
 local Bytes = require("ws.bytes")
-local Buffers = require("ws.buffers")
+local Buffer = require("ws.buffer")
 local Emitter = require("ws.emitter")
 local Bit = require("bit")
 local table_slice = require("ws.util.table_slice")
@@ -26,7 +26,7 @@ local Receiver = {}
 
 function Receiver:new()
   local o = {
-    buffers = Buffers(),
+    buffers = Buffer(),
     __emitter = Emitter(),
     state = GET_INFO,
     data = {},
@@ -37,7 +37,7 @@ function Receiver:new()
 end
 
 function Receiver:get_info()
-  if self.buffers.len() < 2 then
+  if self.buffers.size() < 2 then
     -- Buffer loop ends here when all buffers have been consumed.
     self.__loop = false
     return
@@ -60,7 +60,7 @@ end
 
 function Receiver:get_data()
   if self.payload_length and self.payload_length > 0 then
-    if self.payload_length > self.buffers.len() then
+    if self.payload_length > self.buffers.size() then
       self.__loop = false
       return
     end

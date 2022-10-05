@@ -1,19 +1,15 @@
 local table_slice = require("ws.util.table_slice")
 
-local function Buffers()
+local function Buffer()
   local self = {}
   local buffers = {}
-  local buffered_bytes = 0
-
-  local function add_buffer_bytes(n)
-    buffered_bytes = buffered_bytes + n
-  end
+  local size = 0
 
   function self.consume(n)
     assert(n > 0, "Cannot consume zero bytes")
-    assert(n <= buffered_bytes, "Out of bounds error")
+    assert(n <= size, "Out of bounds error")
 
-    add_buffer_bytes(-n)
+    size = size - n
 
     if #buffers[1] == n then
       return table.remove(buffers, 1)
@@ -30,14 +26,14 @@ local function Buffers()
 
   function self.push(buf)
     table.insert(buffers, buf)
-    add_buffer_bytes(#buf)
+    size = size + #buf
   end
 
-  function self.len()
-    return buffered_bytes
+  function self.size()
+    return size
   end
 
   return self
 end
 
-return Buffers
+return Buffer
