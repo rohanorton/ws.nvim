@@ -4,6 +4,7 @@ local OpeningHandshakeSender = require("ws.opening_handshake_sender")
 local OpeningHandshakeReceiver = require("ws.opening_handshake_receiver")
 local Receiver = require("ws.receiver")
 local Bytes = require("ws.bytes")
+local Buffer = require("ws.buffer")
 local Emitter = require("ws.emitter")
 
 local uv = vim.loop
@@ -11,7 +12,7 @@ local uv = vim.loop
 local function WebSocketClient(address)
   local self = {}
   local receiver
-  local last_chunk
+  local buffer = Buffer()
 
   address = Url.parse(address)
   local websocket_key = WebSocketKey:create()
@@ -32,31 +33,18 @@ local function WebSocketClient(address)
   end
 
   local function create_receiver()
-    local rec = Receiver:new()
-    rec:on_ping(send_pong)
-    rec:on_message(function(msg, is_binary)
+    local rec = Receiver({ buffer = buffer })
+    rec.on_ping(send_pong)
+    rec.on_message(function(msg, is_binary)
       emitter.emit("message", msg, is_binary)
     end)
     return rec
   end
 
-  -- HACK: Sometimes frames are sent before handshake has been fully
-  -- received. We need to send the remaining data to the new receiver.
-  local function receive_remnant()
-    if last_chunk then
-      local end_of_header = string.find(last_chunk, "\r\n\r\n")
-      local remnant = (string.sub(last_chunk, end_of_header + 4))
-      if string.len(remnant) > 0 then
-        receiver:write(remnant)
-      end
-      last_chunk = nil
-    end
-  end
-
   local function set_open_state()
     receiver = create_receiver()
     emitter.emit("open")
-    receive_remnant()
+    receiver.write("")
   end
 
   local function emit_error_and_close(err)
@@ -65,11 +53,12 @@ local function WebSocketClient(address)
   end
 
   local function create_opening_handshake_receiver()
-    local rec = OpeningHandshakeReceiver:new({
+    local rec = OpeningHandshakeReceiver({
       websocket_key = websocket_key,
+      buffer = buffer,
     })
-    rec:on_success(set_open_state)
-    rec:on_error(emit_error_and_close)
+    rec.on_success(set_open_state)
+    rec.on_error(emit_error_and_close)
     return rec
   end
 
@@ -113,8 +102,7 @@ local function WebSocketClient(address)
   local function receive()
     read_start(function(chunk)
       if chunk then
-        last_chunk = chunk
-        receiver:write(chunk)
+        receiver.write(Bytes.from_string(chunk))
       end
     end)
   end

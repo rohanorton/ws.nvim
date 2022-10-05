@@ -195,7 +195,7 @@ describe("WebSocketClient", function()
 
       ws.connect()
 
-      eq("ERROR: Unexpected Response:\n\nNot a valid response\r\n\r\n", rx())
+      eq("ERROR: Invalid header status line", rx())
     end)
 
     a.it("calls on_open when handshake successful", function()

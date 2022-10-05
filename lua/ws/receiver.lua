@@ -1,10 +1,9 @@
-local Bytes = require("ws.bytes")
 local Buffer = require("ws.buffer")
 local Emitter = require("ws.emitter")
 local Bit = require("bit")
 local table_slice = require("ws.util.table_slice")
 
-local OP = {
+local OP_CODE = {
   CONTINUATION = 0x00,
   TEXT = 0x01,
   BIN = 0x02,
@@ -15,6 +14,7 @@ local OP = {
   -- Reserved : 0x0B - 0x0F
 }
 
+-- STATE ENUM
 local GET_INFO = 0
 local GET_PAYLOAD_LENGTH_16 = 1
 local GET_PAYLOAD_LENGTH_64 = 2
@@ -22,129 +22,124 @@ local GET_MASK = 3
 local GET_DATA = 4
 local INFLATING = 5
 
-local Receiver = {}
+function Receiver(o)
+  local self = {}
+  o = o or {}
+  local buffers = o.buffer or Buffer()
+  local emitter = Emitter()
+  local state = GET_INFO
+  local loop = false
 
-function Receiver:new()
-  local o = {
-    buffers = Buffer(),
-    __emitter = Emitter(),
-    state = GET_INFO,
-    data = {},
-  }
-  setmetatable(o, self)
-  self.__index = self
-  return o
-end
+  local is_masked, op_code, fin, payload_length, mask
+  local data = {}
 
-function Receiver:get_info()
-  if self.buffers.size() < 2 then
-    -- Buffer loop ends here when all buffers have been consumed.
-    self.__loop = false
-    return
-  end
-
-  local buf = self.buffers.consume(2)
-
-  self.fin = Bit.band(buf[1], 0x80) == 0x80
-  self.op_code = Bit.band(buf[1], 0x0f)
-  self.payload_length = Bit.band(buf[2], 0x7f)
-  self.is_masked = Bit.band(buf[2], 0x80) == 0x80
-
-  self.state = self.is_masked and GET_MASK or GET_DATA
-end
-
-function Receiver:get_mask()
-  self.mask = self.buffers.consume(4)
-  self.state = GET_DATA
-end
-
-function Receiver:get_data()
-  if self.payload_length and self.payload_length > 0 then
-    if self.payload_length > self.buffers.size() then
-      self.__loop = false
+  -- PRIVATE --
+  local function get_info()
+    if buffers.size() < 2 then
+      -- Buffer loop ends here when all buffers have been consumed.
+      loop = false
       return
     end
-    self.data = self.buffers.consume(self.payload_length)
-    if self.is_masked then
-      self:unmask(self.data, self.mask)
+
+    local buf = buffers.consume(2)
+
+    fin = Bit.band(buf[1], 0x80) == 0x80
+    op_code = Bit.band(buf[1], 0x0f)
+    payload_length = Bit.band(buf[2], 0x7f)
+    is_masked = Bit.band(buf[2], 0x80) == 0x80
+
+    state = is_masked and GET_MASK or GET_DATA
+  end
+
+  local function get_mask()
+    mask = buffers.consume(4)
+    state = GET_DATA
+  end
+
+  local function unmask(buffer)
+    for i = 1, #buffer do
+      buffer[i] = Bit.bxor(buffer[i], mask[Bit.band(i - 1, 3) + 1])
     end
   end
 
-  if self.op_code > 0x07 then
-    return self:control_message()
+  local function control_message()
+    if op_code == OP_CODE.CONN_CLOSE then
+      local buf = data
+      buf = table_slice(buf, 3) -- WHYYY?!?!??!
+      emitter.emit("conclude", 1005, buf)
+    elseif op_code == OP_CODE.PING then
+      emitter.emit("ping")
+    elseif op_code == OP_CODE.PONG then
+      emitter.emit("pong")
+    end
+    state = GET_INFO
   end
 
-  self:data_message()
-end
+  local function data_message()
+    if data then
+      emitter.emit("message", data, false)
+    end
 
-function Receiver:unmask(buffer, mask)
-  for i = 1, #buffer do
-    buffer[i] = Bit.bxor(buffer[i], mask[Bit.band(i - 1, 3) + 1])
-  end
-end
-
-function Receiver:data_message()
-  if self.data then
-    self.__emitter.emit("message", self.data, false)
+    state = GET_INFO
   end
 
-  self.state = GET_INFO
-end
+  local function get_data()
+    if payload_length and payload_length > 0 then
+      if payload_length > buffers.size() then
+        loop = false
+        return
+      end
+      data = buffers.consume(payload_length)
+      if is_masked then
+        unmask(data)
+      end
+    end
 
-function Receiver:control_message()
-  if self.op_code == OP.CONN_CLOSE then
-    local buf = self.data
-    buf = table_slice(buf, 3) -- WHYYY?!?!??!
-    self.__emitter.emit("conclude", 1005, buf)
-  elseif self.op_code == OP.PING then
-    self.__emitter.emit("ping")
-  elseif self.op_code == OP.PONG then
-    self.__emitter.emit("pong")
+    if op_code > 0x07 then
+      return control_message()
+    end
+
+    data_message()
   end
-  self.state = GET_INFO
-end
 
-function Receiver:write(chunk)
-  -- Convert chunk to bytes and add to buffer
-  local bytes = Bytes.from_string(chunk)
-  self.buffers.push(bytes)
-
-  self:start_loop()
-end
-
-function Receiver:start_loop()
-  self.__loop = true
-  while self.__loop do
-    if self.state == GET_INFO then
-      self:get_info()
-    elseif self.state == GET_MASK then
-      self:get_mask()
-    elseif self.state == GET_DATA then
-      self:get_data()
-    else
-      self.__loop = false
+  local function start_loop()
+    loop = true
+    while loop do
+      if state == GET_INFO then
+        get_info()
+      elseif state == GET_MASK then
+        get_mask()
+      elseif state == GET_DATA then
+        get_data()
+      else
+        loop = false
+      end
     end
   end
-end
 
-function Receiver:on_conclude(handler)
-  self.__emitter.on("conclude", handler)
-end
+  -- PUBLIC --
+  function self.write(chunk)
+    buffers.push(chunk)
+    start_loop()
+  end
 
-function Receiver:on_message(handler)
-  self.__emitter.on("message", handler)
-end
+  function self.on_conclude(handler)
+    emitter.on("conclude", handler)
+  end
 
-function Receiver:on_ping(handler)
-  self.__emitter.on("ping", handler)
-end
+  function self.on_message(handler)
+    emitter.on("message", handler)
+  end
 
-function Receiver:on_pong(handler)
-  self.__emitter.on("pong", handler)
-end
+  function self.on_ping(handler)
+    emitter.on("ping", handler)
+  end
 
-function Receiver:on(evt, handler)
-  self.__emitter.on(evt, handler)
+  function self.on_pong(handler)
+    emitter.on("pong", handler)
+  end
+
+  return self
 end
 
 return Receiver
