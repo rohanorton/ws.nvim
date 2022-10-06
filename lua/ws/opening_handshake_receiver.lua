@@ -26,6 +26,7 @@ local function OpeningHandshakeReceiver(o)
 
   local state = GET_STATUS
 
+  o = o or {}
   local websocket_key = o.websocket_key or WebSocketKey:create()
   local buffer = o.buffer or Buffer()
   local emitter = Emitter()
@@ -42,7 +43,7 @@ local function OpeningHandshakeReceiver(o)
     return websocket_key:check_server_key(server_key)
   end
 
-  local function invalid_header_status_line(detail)
+  local function invalid_header_status_line()
     loop = false
     return "ERROR: Invalid header status line"
   end
@@ -85,17 +86,13 @@ local function OpeningHandshakeReceiver(o)
     local pattern = HTTP_VERSION .. SPACE .. STATUS_CODE .. SPACE .. REASON_PHRASE .. CRLF
     local http_version, status_code, reason_phrase = line:match(pattern)
     if not status_code then
-      return invalid_header_status_line(line)
+      return invalid_header_status_line()
     elseif status_code == "101" then
       state = COLLECT_HEADERS
     elseif status_code[1] == "3" then
       state = REDIRECT
-    elseif status_code[1] == "4" then
-      return "Failed Error"
-    elseif status_code[1] == "5" then
-      return "Server Error"
     else
-      return "Unknown Error"
+      return "Unexpected server response: " .. status_code
     end
   end
 

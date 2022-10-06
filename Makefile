@@ -27,6 +27,10 @@ test.handshake: # Runs handshake test
 	$(call run_test, lua/tests/ws/opening_handshake_sender_spec.lua)
 .PHONY: test.handshake
 
+test.handshake_receiver: # Runs handshake receiver test
+	$(call run_test, lua/tests/ws/opening_handshake_receiver_spec.lua)
+.PHONY: test.handshake_receiver
+
 test.sha1: # Runs sha1 test
 	$(call run_test, lua/tests/ws/sha1_spec.lua)
 .PHONY: test.sha1
