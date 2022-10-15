@@ -3,79 +3,99 @@ local channel = require("plenary.async.control").channel
 local eq = assert.are.same
 local uv = vim.loop
 
+local FrameBuilder = require("ws.frame_builder")
 local WebSocketKey = require("ws.websocket_key")
 local WebSocketClient = require("ws.websocket_client")
 local Bytes = require("ws.bytes")
 
 describe("WebSocketClient", function()
-  describe(".connect()", function()
-    local ws, server, server_url, port, sock
+  local ws, server, server_url, port, sock
 
-    -- HELPERS --
-    local function server_listen_for_connection(callback)
-      server:listen(128, callback)
-    end
+  -- HELPERS --
+  local function server_listen_for_connection(callback)
+    server:listen(128, callback)
+  end
 
-    local function server_listen_for_chunk(callback)
-      server_listen_for_connection(function()
-        sock = uv.new_tcp()
-        server:accept(sock)
-        sock:read_start(callback)
-      end)
-    end
+  local function server_listen_for_chunk(callback)
+    server_listen_for_connection(function()
+      sock = uv.new_tcp()
+      server:accept(sock)
+      sock:read_start(callback)
+    end)
+  end
 
-    local function is_complete_http_header(str)
-      return string.match(str, "\r\n\r\n")
-    end
+  local function is_complete_http_header(str)
+    return string.match(str, "\r\n\r\n")
+  end
 
-    local function send_server_handshake(request_header)
-      local client_key = string.match(request_header, "Sec%-WebSocket%-Key: (.-)\r\n")
-      local server_key = WebSocketKey:from(client_key):to_server_key()
+  local function send_server_handshake(request_header)
+    local client_key = string.match(request_header, "Sec%-WebSocket%-Key: (.-)\r\n")
+    local server_key = WebSocketKey:from(client_key):to_server_key()
 
-      sock:write("HTTP/1.1 101 Switching Protocols\r\n")
-      sock:write("Upgrade: websocket\r\n")
-      sock:write("Connection: Upgrade\r\n")
-      sock:write("Sec-WebSocket-Accept: " .. server_key .. "\r\n")
-      sock:write("\r\n")
-    end
+    sock:write("HTTP/1.1 101 Switching Protocols\r\n")
+    sock:write("Upgrade: websocket\r\n")
+    sock:write("Connection: Upgrade\r\n")
+    sock:write("Sec-WebSocket-Accept: " .. server_key .. "\r\n")
+    sock:write("\r\n")
+  end
 
-    local function server_connect_and_send(frame, callback)
-      local received_handshake = false
-      local handshake = ""
-      server_listen_for_chunk(function(err, chunk)
-        if err then
-          return callback(err)
-        end
-        if not received_handshake then
-          handshake = handshake .. chunk
-          received_handshake = is_complete_http_header(handshake)
-          if received_handshake then
-            send_server_handshake(handshake)
-            sock:write(frame)
-          end
-        else
-          callback(nil, chunk)
-        end
-      end)
-    end
-
-    local function server_listen_for_client_handshake(callback)
-      local handshake = ""
-      server_listen_for_chunk(function(err, chunk)
-        if err then
-          return callback(err)
-        end
+  local function server_connect_and_send(frame, callback)
+    local received_handshake = false
+    local handshake = ""
+    server_listen_for_chunk(function(err, chunk)
+      if err then
+        return callback(err)
+      end
+      if not received_handshake then
         handshake = handshake .. chunk
-        if is_complete_http_header(handshake) then
-          callback(nil, handshake)
+        received_handshake = is_complete_http_header(handshake)
+        if received_handshake then
+          send_server_handshake(handshake)
+          sock:write(frame)
         end
-      end)
-    end
+      else
+        callback(nil, chunk)
+      end
+    end)
+  end
 
-    local function close_if_active(entity)
-      return entity and entity:is_active() and entity:close()
-    end
+  local function server_connect_and_receive(callback)
+    local received_handshake = false
+    local handshake = ""
+    server_listen_for_chunk(function(err, chunk)
+      if err then
+        return callback(err)
+      end
+      if not received_handshake then
+        handshake = handshake .. chunk
+        received_handshake = is_complete_http_header(handshake)
+        if received_handshake then
+          send_server_handshake(handshake)
+        end
+      else
+        callback(nil, chunk)
+      end
+    end)
+  end
 
+  local function server_listen_for_client_handshake(callback)
+    local handshake = ""
+    server_listen_for_chunk(function(err, chunk)
+      if err then
+        return callback(err)
+      end
+      handshake = handshake .. chunk
+      if is_complete_http_header(handshake) then
+        callback(nil, handshake)
+      end
+    end)
+  end
+
+  local function close_if_active(entity)
+    return entity and entity:is_active() and entity:close()
+  end
+
+  describe(".connect()", function()
     -- SETUP / TEARDOWN --
     before_each(function()
       -- Create a TCP server bound to a free port
@@ -252,7 +272,8 @@ describe("WebSocketClient", function()
     a.it("responds to server's ping with a pong", function()
       local tx, rx = channel.oneshot()
 
-      local ping = Bytes.to_string({ 0x89, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00 })
+      local ping = Bytes.to_string(FrameBuilder().ping().fin().build())
+
       server_connect_and_send(ping, function(err, chunk)
         if err then
           return tx(err)
@@ -282,12 +303,33 @@ describe("WebSocketClient", function()
 
       eq("pong received", rx())
     end)
+  end)
+  describe(".on_message()", function()
+    before_each(function()
+      -- Create a TCP server bound to a free port
+      server = uv.new_tcp()
+      uv.tcp_bind(server, "127.0.0.1", 0)
+
+      -- Generate server URL
+      local addr = uv.tcp_getsockname(server)
+      port = addr.port
+      server_url = "ws://127.0.0.1:" .. port
+    end)
+
+    after_each(function()
+      close_if_active(ws)
+      close_if_active(sock)
+      close_if_active(server)
+      -- Unassign vars
+      ws = nil
+      sock = nil
+      server = nil
+    end)
 
     a.it("receives messages from the server", function()
       local tx, rx = channel.oneshot()
 
-      -- Unmasked message containing "Hello"
-      local hello = Bytes.to_string({ 0x81, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f })
+      local hello = Bytes.to_string(FrameBuilder().text().payload("Hello").fin().build())
       server_connect_and_send(hello, function(err)
         if err then
           return tx(err)
