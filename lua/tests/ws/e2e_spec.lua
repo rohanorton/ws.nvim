@@ -30,7 +30,7 @@ a.describe("E2E Test", function()
 
       ws.on_message(function(msg)
         has_received_data = true
-        assert.is_equal(msg, "hello")
+        assert.is_equal(msg:to_string(), "hello")
         -- Close server on successful message
         ws:close()
       end)

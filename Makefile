@@ -35,6 +35,10 @@ test.sha1: # Runs sha1 test
 	$(call run_test, lua/tests/ws/sha1_spec.lua)
 .PHONY: test.sha1
 
+test.array: # Runs array test
+	$(call run_test, lua/tests/ws/array_spec.lua)
+.PHONY: test.array
+
 test.bytes: # Runs bytes test
 	$(call run_test, lua/tests/ws/bytes_spec.lua)
 .PHONY: test.bytes

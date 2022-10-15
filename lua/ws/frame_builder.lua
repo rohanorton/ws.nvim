@@ -5,7 +5,7 @@ local Random = require("ws.random")
 local bxor = bit.bxor
 local bor = bit.bor
 
-local EMPTY_BUFFER = {}
+local EMPTY_BUFFER = Bytes:new()
 
 local function FrameBuilder()
   local self = {}
@@ -17,22 +17,22 @@ local function FrameBuilder()
   local rsv3_bit = 0x00
   local op_code = 0x00
   local mask = 0x00
-  local mask_bytes = {}
+  local mask_bytes = Bytes:new()
   local payload = EMPTY_BUFFER
 
   local function initialise_payload_length_byte_array(length)
     if length < 126 then
       -- Uses 7 bits of the first byte.
-      return { 0 }
+      return Bytes:new({ 0 })
     end
 
     if length < 65536 then
       -- 16 byte unsigned int (2 bytes), denoted with code 126.
-      return { 126, 0, 0 }
+      return Bytes:new({ 126, 0, 0 })
     end
 
     -- 64 byte unsigned int (8 bytes), denoted with code 127.
-    return { 127, 0, 0, 0, 0, 0, 0, 0, 0 }
+    return Bytes:new({ 127, 0, 0, 0, 0, 0, 0, 0, 0 })
   end
 
   local function payload_length()
@@ -52,8 +52,8 @@ local function FrameBuilder()
     if mask == 0 then
       return data
     end
-    local output = {}
-    for i = 1, #data do
+    local output = Bytes:new()
+    for i = 1, data:len() do
       -- j = i mod 4
       -- transformed-octet-i = original-octet-i XOR masking-key-octet-j
 
@@ -61,7 +61,8 @@ local function FrameBuilder()
       local original_octet_i = data[i]
       local masking_key_octet_j = mask_bytes[j]
       local transformed_octet_i = bxor(original_octet_i, masking_key_octet_j)
-      output[i] = transformed_octet_i
+
+      output:append(transformed_octet_i)
     end
 
     return output
@@ -120,38 +121,27 @@ local function FrameBuilder()
     if type(_payload) == "string" then
       _payload = Bytes.from_string(_payload)
     end
-    payload = _payload
+    payload = Bytes:new(_payload)
     return self
   end
 
   function self.build()
-    local frame = {}
-
-    local i = 2
+    local frame = Bytes:new()
 
     -- Set fin and rsv bits, and op code nibble in first byte.
     frame[1] = bor(fin_bit, rsv1_bit, rsv2_bit, rsv3_bit, op_code)
 
     -- Add payload length (this is a byte array of varying length)
-    for _, byte in ipairs(payload_length()) do
-      frame[i] = byte
-      i = i + 1
-    end
+    frame:extend(payload_length())
 
     -- Set mask bit on second byte.
     frame[2] = bor(frame[2], mask)
 
     -- Add mask bytes (either 0 or 4 bytes)
-    for _, byte in ipairs(mask_bytes) do
-      frame[i] = byte
-      i = i + 1
-    end
+    frame:extend(mask_bytes)
 
     -- Add (masked) payload bytes
-    for _, byte in ipairs(apply_mask(payload)) do
-      frame[i] = byte
-      i = i + 1
-    end
+    frame:extend(apply_mask(payload))
 
     return frame
   end

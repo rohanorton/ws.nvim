@@ -1,8 +1,9 @@
-local table_slice = require("ws.util.table_slice")
+local Array = require("ws.array")
+local Bytes = require("ws.bytes")
 
 local function Buffer()
   local self = {}
-  local buffers = {}
+  local buffers = Array:new()
   local size = 0
 
   function self.consume(n)
@@ -17,20 +18,20 @@ local function Buffer()
 
     if n < #buffers[1] then
       local buf = buffers[1]
-      buffers[1] = table_slice(buf, n + 1)
-      return table_slice(buf, 1, n)
+      buffers[1] = buf:slice(n + 1)
+      return buf:slice(1, n)
     end
 
-    local res = {}
+    local res = Bytes:new()
 
     local m = 0
     for buf_num, buf in ipairs(buffers) do
       for index, byte in ipairs(buf) do
         m = m + 1
-        table.insert(res, byte)
+        res:append(byte)
         if n == m then
-          buffers = table_slice(buffers, buf_num + 1)
-          table.insert(buffers, 1, table_slice(buf, index + 1))
+          buffers = buffers:slice(buf_num + 1)
+          buffers:insert(1, buf:slice(index + 1))
           return res
         end
       end
@@ -39,14 +40,14 @@ local function Buffer()
 
   function self.consume_until(fn)
     local n = 0
-    local res = {}
+    local res = Bytes:new()
     for buf_num, buf in ipairs(buffers) do
       for index, byte in ipairs(buf) do
         n = n + 1
-        table.insert(res, byte)
+        res:append(byte)
         if fn(byte) then
-          buffers = table_slice(buffers, buf_num + 1)
-          table.insert(buffers, 1, table_slice(buf, index + 1))
+          buffers = buffers:slice(buf_num + 1)
+          buffers:insert(1, buf:slice(index + 1))
           size = size - n
           return res
         end
@@ -55,8 +56,8 @@ local function Buffer()
   end
 
   function self.push(buf)
-    table.insert(buffers, buf)
-    size = size + #buf
+    buffers:append(buf)
+    size = size + buf:len()
   end
 
   function self.size()

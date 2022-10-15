@@ -11,7 +11,7 @@ describe("Receiver", function()
 
   it("does nothing on empty message", function()
     -- Monstly this is to ensure that the function doesn't crash!
-    local buffer = {}
+    local buffer = Bytes:new()
     receiver.write(buffer)
   end)
 
@@ -21,7 +21,7 @@ describe("Receiver", function()
       ping_received = true
     end)
 
-    local buffer = { 0x89, 0x00 }
+    local buffer = Bytes:new({ 0x89, 0x00 })
 
     receiver.write(buffer)
 
@@ -34,7 +34,7 @@ describe("Receiver", function()
       pong_received = true
     end)
 
-    local buffer = { 0x8A, 0x00 }
+    local buffer = Bytes:new({ 0x8A, 0x00 })
 
     receiver.write(buffer)
 
@@ -49,7 +49,7 @@ describe("Receiver", function()
       complete = true
     end)
 
-    local buffer = { 0x81, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f }
+    local buffer = Bytes:new({ 0x81, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f })
 
     receiver.write(buffer)
 
@@ -64,7 +64,7 @@ describe("Receiver", function()
       complete = true
     end)
 
-    local buffer = { 0x88, 0x00 }
+    local buffer = Bytes:new({ 0x88, 0x00 })
     receiver.write(buffer)
 
     assert(complete, "Test did not complete!")
@@ -78,8 +78,8 @@ describe("Receiver", function()
       complete = true
     end)
 
-    receiver.write({ 0x88, 0x06 })
-    receiver.write({ 0x03, 0xE8, 0x44, 0x4F, 0x4E, 0x45 })
+    receiver.write(Bytes:new({ 0x88, 0x06 }))
+    receiver.write(Bytes:new({ 0x03, 0xE8, 0x44, 0x4F, 0x4E, 0x45 }))
 
     assert(complete, "Test did not complete!")
   end)
@@ -93,13 +93,13 @@ describe("Receiver", function()
     end)
 
     -- stylua: ignore
-    local buf = {
+    local buf = Bytes:new({
       0x81, 0x93, 0x34, 0x83, 0xA8,
       0x68, 0x01, 0xB9, 0x92, 0x52,
       0x4F, 0xA1, 0xC6, 0x09, 0x59,
       0xE6, 0x8A, 0x52, 0x16, 0xE6,
       0xCB, 0x00, 0x5B, 0xA1, 0xD5,
-    }
+    })
 
     receiver.write(buf)
 

@@ -1,0 +1,81 @@
+local Array = require("ws.array")
+
+describe("Array", function()
+  describe("new()", function()
+    it("creates new array", function()
+      local arr = Array:new()
+
+      assert(arr)
+    end)
+  end)
+
+  describe("clone()", function()
+    it("copies the contents of the array", function()
+      local arr1 = Array:new({ 1, 2, 3 })
+      local arr2 = arr1:clone()
+
+      assert.are.same(arr1, arr2)
+    end)
+
+    it("is not just a referential copy", function()
+      local arr1 = Array:new({ 1, 2, 3 })
+      local arr2 = arr1:clone()
+
+      arr2[1] = "Mutated new array!"
+
+      assert.are.not_same(arr1, arr2)
+    end)
+  end)
+
+  describe("append()", function()
+    it("appends a value to the current array", function()
+      local arr = Array:new({ 1, 2, 3 })
+      arr:append(4)
+      local expected = Array:new({ 1, 2, 3, 4 })
+      assert.are.same(arr, expected)
+    end)
+  end)
+
+  describe("slice())", function()
+    it("returns array slice from start index until end", function()
+      local arr = Array:new({ 1, 2, 3, 4, 5, 6, 7, 8, 9 })
+      local actual = arr:slice(6)
+      local expected = Array:new({ 6, 7, 8, 9 })
+      assert.are.same(actual, expected)
+    end)
+
+    it("returns array slice between two indexes", function()
+      local arr = Array:new({ 1, 2, 3, 4, 5, 6, 7, 8, 9 })
+      local actual = arr:slice(2, 3)
+      local expected = Array:new({ 2, 3 })
+      assert.are.same(actual, expected)
+    end)
+
+    it("throws error on bad arguments", function()
+      local arr = Array:new({ 1, 2, 3, 4, 5, 6, 7, 8, 9 })
+      assert.has_error(function()
+        arr:slice(nil, "")
+      end, "BadArgument: expected number, received nil")
+    end)
+  end)
+
+  describe("extend()", function()
+    it("combines two arrays into one", function()
+      local arr1 = Array:new({ 1, 2, 3 })
+      local arr2 = Array:new({ 4, 5, 6 })
+      arr1:extend(arr2)
+      local expected = Array:new({ 1, 2, 3, 4, 5, 6 })
+      assert.are.same(arr1, expected)
+    end)
+  end)
+
+  describe("__concat()", function()
+    it("combines two arrays into one", function()
+      local arr1 = Array:new({ 1, 2, 3 })
+      local arr2 = Array:new({ 4, 5, 6 })
+      local actual = arr1 .. arr2
+      local expected = Array:new({ 1, 2, 3, 4, 5, 6 })
+      assert.are.same(actual, expected)
+    end)
+  end)
+end)

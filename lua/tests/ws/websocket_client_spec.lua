@@ -344,7 +344,7 @@ describe("WebSocketClient", function()
 
       ws.on_message(function(msg, is_binary)
         assert(not is_binary, "Received binary data")
-        tx("Received message: " .. msg)
+        tx("Received message: " .. msg:to_string())
       end)
 
       ws.connect()
@@ -429,7 +429,7 @@ describe("WebSocketClient", function()
 
       receiver.on_message(function(msg, is_binary)
         assert(not is_binary, "Message should not be binary")
-        tx("Received message: " .. Bytes.to_string(msg))
+        tx("Received message: " .. msg:to_string())
       end)
 
       ws = WebSocketClient(server_url)

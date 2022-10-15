@@ -1,7 +1,7 @@
 local Buffer = require("ws.buffer")
 local Emitter = require("ws.emitter")
+local Bytes = require("ws.bytes")
 local Bit = require("bit")
-local table_slice = require("ws.util.table_slice")
 
 local OP_CODE = {
   CONTINUATION = 0x00,
@@ -31,7 +31,7 @@ function Receiver(o)
   local loop = false
 
   local is_masked, op_code, fin, payload_length, mask
-  local data = {}
+  local data = Bytes:new()
 
   -- PRIVATE --
   local function get_info()
@@ -66,7 +66,7 @@ function Receiver(o)
   local function control_message()
     if op_code == OP_CODE.CONN_CLOSE then
       local buf = data
-      buf = table_slice(buf, 3) -- WHYYY?!?!??!
+      buf = buf:slice(3) -- WHYYY?!?!??!
       emitter.emit("conclude", 1005, buf)
     elseif op_code == OP_CODE.PING then
       emitter.emit("ping")

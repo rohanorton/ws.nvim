@@ -29,7 +29,7 @@ describe("OpeningHandshakeReceiver", function()
 
   it("does nothing on empty message", function()
     -- Mostly this is to ensure that the function doesn't crash!
-    local buffer = {}
+    local buffer = Bytes:new()
     receiver.write(buffer)
   end)
 

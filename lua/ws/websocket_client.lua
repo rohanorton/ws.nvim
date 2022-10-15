@@ -34,7 +34,7 @@ local function WebSocketClient(address)
       sender.pong()
     end)
     rec.on_message(function(msg, is_binary)
-      emitter.emit("message", Bytes.to_string(msg), is_binary)
+      emitter.emit("message", msg, is_binary)
     end)
     return rec
   end
@@ -47,7 +47,7 @@ local function WebSocketClient(address)
   local function set_open_state()
     receiver = create_receiver()
     sender = create_sender()
-    receiver.write({})
+    receiver.write(Bytes:new())
     emitter.emit("open")
   end
 
