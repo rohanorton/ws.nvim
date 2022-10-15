@@ -116,7 +116,9 @@ local function WebSocketClient(address)
     emitter.on("open", handler)
   end
 
-  function self.on_close(_) end
+  function self.on_close(handler)
+    emitter.on("close", handler)
+  end
 
   function self.on_error(handler)
     emitter.on("error", handler)
@@ -147,6 +149,7 @@ local function WebSocketClient(address)
   function self.close()
     -- TODO: This should start a closing handshake, but for now ...
     tcp_client:close()
+    emitter.emit("close")
   end
 
   function self.is_active()

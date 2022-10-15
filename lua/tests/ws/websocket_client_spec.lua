@@ -352,6 +352,47 @@ describe("WebSocketClient", function()
       eq("Received message: Hello", rx())
     end)
   end)
+  describe(".on_close()", function()
+    before_each(function()
+      -- Create a TCP server bound to a free port
+      server = uv.new_tcp()
+      uv.tcp_bind(server, "127.0.0.1", 0)
+
+      -- Generate server URL
+      local addr = uv.tcp_getsockname(server)
+      port = addr.port
+      server_url = "ws://127.0.0.1:" .. port
+      server_connect_and_receive()
+    end)
+
+    after_each(function()
+      close_if_active(ws)
+      close_if_active(sock)
+      close_if_active(server)
+      -- Unassign vars
+      ws = nil
+      sock = nil
+      server = nil
+    end)
+
+    a.it("receives fires when the connection is closed by the client", function()
+      local tx, rx = channel.oneshot()
+
+      ws = WebSocketClient(server_url)
+
+      ws.on_close(function()
+        tx("success")
+      end)
+
+      ws.on_open(function()
+        ws.close()
+      end)
+
+      ws.connect()
+
+      eq("success", rx())
+    end)
+  end)
   describe(".send()", function()
     before_each(function()
       -- Create a TCP server bound to a free port
