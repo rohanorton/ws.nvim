@@ -47,6 +47,10 @@ test.receiver: # Runs receiver test
 	$(call run_test, lua/tests/ws/receiver_spec.lua)
 .PHONY: test.receiver
 
+test.sender: # Runs sender test
+	$(call run_test, lua/tests/ws/sender_spec.lua)
+.PHONY: test.sender
+
 test.frame_builder: # Runs frame builder test
 	$(call run_test, lua/tests/ws/frame_builder_spec.lua)
 .PHONY: test.frame_builder
