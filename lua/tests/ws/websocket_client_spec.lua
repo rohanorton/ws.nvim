@@ -353,4 +353,58 @@ describe("WebSocketClient", function()
       eq("Received message: Hello", rx())
     end)
   end)
+  describe(".send()", function()
+    before_each(function()
+      -- Create a TCP server bound to a free port
+      server = uv.new_tcp()
+      uv.tcp_bind(server, "127.0.0.1", 0)
+
+      -- Generate server URL
+      local addr = uv.tcp_getsockname(server)
+      port = addr.port
+      server_url = "ws://127.0.0.1:" .. port
+    end)
+
+    after_each(function()
+      close_if_active(ws)
+      close_if_active(sock)
+      close_if_active(server)
+      -- Unassign vars
+      ws = nil
+      sock = nil
+      server = nil
+    end)
+
+    a.it("sends a text message to the server", function()
+      local tx, rx = channel.oneshot()
+
+      local receiver = Receiver()
+
+      server_connect_and_receive(function(err, chunk)
+        if err then
+          return tx(err)
+        end
+        receiver.write(Bytes.from_string(chunk))
+      end)
+
+      receiver.on_message(function(msg, is_binary)
+        assert(not is_binary, "Message should not be binary")
+        tx("Received message: " .. Bytes.to_string(msg))
+      end)
+
+      ws = WebSocketClient(server_url)
+
+      ws.on_error(function(err)
+        tx(err)
+      end)
+
+      ws.on_open(function()
+        ws.send("Testing 123")
+      end)
+
+      ws.connect()
+
+      eq("Received message: Testing 123", rx())
+    end)
+  end)
 end)

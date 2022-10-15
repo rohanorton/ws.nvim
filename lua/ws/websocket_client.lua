@@ -3,6 +3,7 @@ local WebSocketKey = require("ws.websocket_key")
 local OpeningHandshakeSender = require("ws.opening_handshake_sender")
 local OpeningHandshakeReceiver = require("ws.opening_handshake_receiver")
 local Receiver = require("ws.receiver")
+local Sender = require("ws.sender")
 local Bytes = require("ws.bytes")
 local Buffer = require("ws.buffer")
 local Emitter = require("ws.emitter")
@@ -12,6 +13,7 @@ local uv = vim.loop
 local function WebSocketClient(address)
   local self = {}
   local receiver
+  local sender
   local buffer = Buffer()
 
   address = Url.parse(address)
@@ -26,25 +28,27 @@ local function WebSocketClient(address)
 
   local emitter = Emitter()
 
-  local function send_pong()
-    local pong_frame = { 0x8A }
-    local str = Bytes.to_string(pong_frame)
-    tcp_client:write(str)
-  end
-
   local function create_receiver()
     local rec = Receiver({ buffer = buffer })
-    rec.on_ping(send_pong)
+    rec.on_ping(function()
+      sender.pong()
+    end)
     rec.on_message(function(msg, is_binary)
       emitter.emit("message", msg, is_binary)
     end)
     return rec
   end
 
+  local function create_sender()
+    local sen = Sender({ client = tcp_client })
+    return sen
+  end
+
   local function set_open_state()
     receiver = create_receiver()
+    sender = create_sender()
+    receiver.write({})
     emitter.emit("open")
-    receiver.write("")
   end
 
   local function emit_error_and_close(err)
@@ -131,7 +135,14 @@ local function WebSocketClient(address)
     end)
   end
 
-  function self.send(_) end
+  function self.send(msg, opts)
+    opts = opts or {}
+    if opts.is_binary then
+      sender.send_binary(msg)
+    else
+      sender.send_text(msg)
+    end
+  end
 
   function self.close()
     -- TODO: This should start a closing handshake, but for now ...
