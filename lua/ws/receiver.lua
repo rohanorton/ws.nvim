@@ -45,6 +45,7 @@ function Receiver(o)
 
     fin = Bit.band(buf[1], 0x80) == 0x80
     op_code = Bit.band(buf[1], 0x0f)
+    -- TODO: Needs to allow longer paylengths
     payload_length = Bit.band(buf[2], 0x7f)
     is_masked = Bit.band(buf[2], 0x80) == 0x80
 

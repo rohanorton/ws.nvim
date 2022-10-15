@@ -244,9 +244,9 @@ describe("FrameBuilder()", function()
     it("does not mutate the input buffer", function()
       local buf = Bytes.to_string({ 1, 2, 3, 4, 5 })
 
+      -- stylua: ignore
       FrameBuilder()
         .payload(buf)
-        -- .readonly(true)
         .rsv1()
         .mask()
         .binary()
