@@ -3,7 +3,7 @@ local channel = a.control.channel
 
 local WebSocketClient = require("ws.websocket_client")
 
-a.describe("Integration Test", function()
+a.describe("E2E Test", function()
   a.describe("WebsocketClient", function()
     -- WARN: This test relies on internet access and external service websocket-echo.com.
     a.it("communicates successfully with echo service (ws)", function()

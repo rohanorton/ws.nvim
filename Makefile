@@ -7,9 +7,9 @@ test: # Runs all tests
 	nvim --headless --noplugin -u $(minimal_init) -c "PlenaryBustedDirectory ./lua/tests/ { minimal_init = $(minimal_init), timeout = 3000 }"
 .PHONY: test
 
-test.integration: # Runs integration test
-	$(call run_test, lua/tests/ws/integration_spec.lua)
-.PHONY: test.integration
+test.e2e: # Runs e2e test
+	$(call run_test, lua/tests/ws/e2e_spec.lua)
+.PHONY: test.e2e
 
 test.websocket_client: # Runs websocket client test
 	$(call run_test, lua/tests/ws/websocket_client_spec.lua)
