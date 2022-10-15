@@ -1,3 +1,5 @@
+local Bytes = require("ws.bytes")
+
 local Random = {}
 
 function Random.byte()
@@ -5,12 +7,12 @@ function Random.byte()
 end
 
 function Random.bytes(size)
-  local bytearr = {}
+  local bytes = Bytes:new()
   for _ = 1, size do
     local byte = Random.byte()
-    table.insert(bytearr, byte)
+    bytes:append(byte)
   end
-  return bytearr
+  return bytes
 end
 
 return Random
