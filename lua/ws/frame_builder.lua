@@ -5,8 +5,6 @@ local Random = require("ws.random")
 local bxor = bit.bxor
 local bor = bit.bor
 
-local EMPTY_BUFFER = Bytes:new()
-
 local function FrameBuilder()
   local self = {}
 
@@ -18,7 +16,7 @@ local function FrameBuilder()
   local op_code = 0x00
   local mask = 0x00
   local mask_bytes = Bytes:new()
-  local payload = EMPTY_BUFFER
+  local payload = Bytes:new()
 
   local function initialise_payload_length_byte_array(length)
     if length < 126 then
@@ -36,12 +34,12 @@ local function FrameBuilder()
   end
 
   local function payload_length()
-    local payload_length_byte_arr = initialise_payload_length_byte_array(#payload)
+    local payload_length_byte_arr = initialise_payload_length_byte_array(payload:len())
 
-    local length_bytes = Bytes.big_endian_from_int(#payload)
+    local length_bytes = Bytes.big_endian_from_int(payload:len())
 
     for i, byte in ipairs(length_bytes) do
-      local offset_index = i + (#payload_length_byte_arr - #length_bytes)
+      local offset_index = i + (payload_length_byte_arr:len() - length_bytes:len())
       payload_length_byte_arr[offset_index] = byte
     end
 
@@ -119,9 +117,10 @@ local function FrameBuilder()
 
   function self.payload(_payload)
     if type(_payload) == "string" then
-      _payload = Bytes.from_string(_payload)
+      payload = Bytes.from_string(_payload)
+    else
+      payload = Bytes:new(_payload)
     end
-    payload = Bytes:new(_payload)
     return self
   end
 
